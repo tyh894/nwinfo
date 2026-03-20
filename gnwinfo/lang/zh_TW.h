@@ -6,7 +6,7 @@
 static const char*
 lang_zh_tw[N__MAX_] =
 {
-	[N__FONT_] = u8"MingLiU_HKSCS-ExtB",
+	[N__FONT_] = u8"Microsoft YaHei",
 	[N__LANG_NAME_] = u8"正體中文",
 	[N__LOADING] = u8"載入中",
 	[N__PLS_WAIT] = u8"請稍候 ...",

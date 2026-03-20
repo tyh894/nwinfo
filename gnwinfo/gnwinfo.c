@@ -7,6 +7,14 @@
 #include <windowsx.h>
 #include <dbt.h>
 #include <shellapi.h>
+#include <taskschd.h>
+#include <oleauto.h>
+
+#pragma comment(lib, "taskschd.lib")
+#pragma comment(lib, "ole32.lib")
+#pragma comment(lib, "oleaut32.lib")
+
+#define AUTOSTART_TASK_NAME L"gnwinfo_autostart"
 
 LPCSTR NWL_Ucs2ToUtf8(LPCWSTR src);
 LPCWSTR NWL_Utf8ToUcs2(LPCSTR src);
@@ -27,110 +35,287 @@ NOTIFYICONDATAW g_nid;
 
 static UINT m_dpi = USER_DEFAULT_SCREEN_DPI;
 
+static BSTR alloc_bstr(LPCWSTR str)
+{
+	return SysAllocString(str);
+}
+
+static void init_variant(VARIANT* var)
+{
+	VariantInit(var);
+}
+
+static void set_variant_empty(VARIANT* var)
+{
+	VariantClear(var);
+	V_VT(var) = VT_EMPTY;
+}
+
 nk_bool gnwinfo_get_autostart(void)
 {
-	HKEY hKey;
-	LONG result;
-	WCHAR path[MAX_PATH];
-	DWORD size;
-	DWORD type;
 	nk_bool found = nk_false;
-
-	const WCHAR* registry_paths[] = {
-		L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run"
-	};
-	int num_paths = 1;
-
-	for (int i = 0; i < num_paths && !found; i++)
+	HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+	if (FAILED(hr))
 	{
-		const WCHAR* reg_path = registry_paths[i];
-		result = RegOpenKeyExW(HKEY_CURRENT_USER, reg_path, 0, KEY_READ, &hKey);
-		if (result == ERROR_SUCCESS)
-		{
-			size = sizeof(path);
-			result = RegQueryValueExW(hKey, L"gnwinfo", NULL, &type, (LPBYTE)path, &size);
-			RegCloseKey(hKey);
-
-			if (result == ERROR_SUCCESS && type == REG_SZ)
-			{
-				NWL_Debug("AUTOSTART", "Get: Found in %ls, path=%ls", reg_path, path);
-				found = nk_true;
-			}
-		}
+		NWL_Debug("AUTOSTART", "Get: CoInitializeEx failed: 0x%08X", hr);
+		return nk_false;
 	}
 
+	ITaskService* pService = NULL;
+	ITaskFolder* pRootFolder = NULL;
+	IRegisteredTask* pTask = NULL;
+	BSTR bstrRoot = NULL;
+
+	hr = CoCreateInstance(&CLSID_TaskScheduler, NULL, CLSCTX_INPROC_SERVER, &IID_ITaskService, (void**)&pService);
+	if (SUCCEEDED(hr))
+	{
+		VARIANT varEmpty;
+		init_variant(&varEmpty);
+		
+		hr = pService->lpVtbl->Connect(pService, varEmpty, varEmpty, varEmpty, varEmpty);
+		if (SUCCEEDED(hr))
+		{
+			bstrRoot = alloc_bstr(L"\\");
+			hr = pService->lpVtbl->GetFolder(pService, bstrRoot, &pRootFolder);
+			if (SUCCEEDED(hr))
+			{
+				BSTR bstrTaskName = alloc_bstr(AUTOSTART_TASK_NAME);
+				hr = pRootFolder->lpVtbl->GetTask(pRootFolder, bstrTaskName, &pTask);
+				SysFreeString(bstrTaskName);
+				
+				if (SUCCEEDED(hr))
+				{
+					found = nk_true;
+					pTask->lpVtbl->Release(pTask);
+					NWL_Debug("AUTOSTART", "Get: Found task in Task Scheduler");
+				}
+				pRootFolder->lpVtbl->Release(pRootFolder);
+			}
+			SysFreeString(bstrRoot);
+		}
+		pService->lpVtbl->Release(pService);
+	}
+
+	CoUninitialize();
 	NWL_Debug("AUTOSTART", "Get: Returning %d", found);
 	return found;
 }
 
 void gnwinfo_set_autostart_internal(nk_bool enable, nk_bool show_message)
 {
-	HKEY hKey;
-	LONG result;
 	WCHAR path[MAX_PATH];
-	WCHAR quoted_path[MAX_PATH + 4];
-	
+
 	NWL_Debug("AUTOSTART", "Set: enable=%d", enable);
-	
+
 	if (GetModuleFileNameW(NULL, path, MAX_PATH) == 0)
 	{
 		NWL_Debug("AUTOSTART", "Set: Failed to get module path");
 		return;
 	}
-	
-	if (swprintf_s(quoted_path, MAX_PATH + 4, L"\"%s\"", path) == -1)
+
+	HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+	if (FAILED(hr))
 	{
-		NWL_Debug("AUTOSTART", "Set: Failed to format path");
+		NWL_Debug("AUTOSTART", "Set: CoInitializeEx failed: 0x%08X", hr);
+		if (show_message)
+			MessageBoxW(NULL, L"初始化 COM 失败", L"自动启动设置", MB_OK | MB_ICONERROR);
 		return;
 	}
-	
-	const WCHAR* registry_paths[] = {
-		L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run"
-	};
-	int num_paths = 1;
-	
-	for (int i = 0; i < num_paths; i++)
+
+	ITaskService* pService = NULL;
+	ITaskFolder* pRootFolder = NULL;
+	IRegisteredTask* pTask = NULL;
+
+	hr = CoCreateInstance(&CLSID_TaskScheduler, NULL, CLSCTX_INPROC_SERVER, &IID_ITaskService, (void**)&pService);
+	if (FAILED(hr))
 	{
-		const WCHAR* reg_path = registry_paths[i];
-		
-		result = RegCreateKeyExW(HKEY_CURRENT_USER, reg_path, 
-			0, NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &hKey, NULL);
-		
-		if (result == ERROR_SUCCESS)
+		NWL_Debug("AUTOSTART", "Set: CoCreateInstance failed: 0x%08X", hr);
+		CoUninitialize();
+		if (show_message)
+			MessageBoxW(NULL, L"创建任务计划程序失败", L"自动启动设置", MB_OK | MB_ICONERROR);
+		return;
+	}
+
+	VARIANT varEmpty;
+	init_variant(&varEmpty);
+	
+	hr = pService->lpVtbl->Connect(pService, varEmpty, varEmpty, varEmpty, varEmpty);
+	if (FAILED(hr))
+	{
+		NWL_Debug("AUTOSTART", "Set: Connect failed: 0x%08X", hr);
+		pService->lpVtbl->Release(pService);
+		CoUninitialize();
+		if (show_message)
+			MessageBoxW(NULL, L"连接任务计划程序失败", L"自动启动设置", MB_OK | MB_ICONERROR);
+		return;
+	}
+
+	BSTR bstrRoot = alloc_bstr(L"\\");
+	hr = pService->lpVtbl->GetFolder(pService, bstrRoot, &pRootFolder);
+	SysFreeString(bstrRoot);
+	
+	if (FAILED(hr))
+	{
+		NWL_Debug("AUTOSTART", "Set: GetFolder failed: 0x%08X", hr);
+		pService->lpVtbl->Release(pService);
+		CoUninitialize();
+		if (show_message)
+			MessageBoxW(NULL, L"获取任务文件夹失败", L"自动启动设置", MB_OK | MB_ICONERROR);
+		return;
+	}
+
+	if (enable)
+	{
+		ITaskDefinition* pTaskDef = NULL;
+		IRegistrationInfo* pRegInfo = NULL;
+		IPrincipal* pPrincipal = NULL;
+		ITaskSettings* pSettings = NULL;
+		IExecAction* pExecAction = NULL;
+		IAction* pAction = NULL;
+		IActionCollection* pActionColl = NULL;
+		ITrigger* pTrigger = NULL;
+		ITriggerCollection* pTriggerColl = NULL;
+
+		hr = pService->lpVtbl->NewTask(pService, 0, &pTaskDef);
+		if (FAILED(hr))
 		{
-			if (enable)
+			NWL_Debug("AUTOSTART", "Set: NewTask failed: 0x%08X", hr);
+			goto create_fail;
+		}
+
+		hr = pTaskDef->lpVtbl->get_RegistrationInfo(pTaskDef, &pRegInfo);
+		if (SUCCEEDED(hr))
+		{
+			BSTR bstrAuthor = alloc_bstr(L"gnwinfo");
+			BSTR bstrDesc = alloc_bstr(L"NWinfo GUI autostart task");
+			pRegInfo->lpVtbl->put_Author(pRegInfo, bstrAuthor);
+			pRegInfo->lpVtbl->put_Description(pRegInfo, bstrDesc);
+			SysFreeString(bstrAuthor);
+			SysFreeString(bstrDesc);
+			pRegInfo->lpVtbl->Release(pRegInfo);
+		}
+
+		hr = pTaskDef->lpVtbl->get_Principal(pTaskDef, &pPrincipal);
+		if (SUCCEEDED(hr))
+		{
+			pPrincipal->lpVtbl->put_LogonType(pPrincipal, TASK_LOGON_INTERACTIVE_TOKEN);
+			pPrincipal->lpVtbl->put_RunLevel(pPrincipal, TASK_RUNLEVEL_HIGHEST);
+			pPrincipal->lpVtbl->Release(pPrincipal);
+		}
+
+		hr = pTaskDef->lpVtbl->get_Settings(pTaskDef, &pSettings);
+		if (SUCCEEDED(hr))
+		{
+			BSTR bstrTimeLimit = alloc_bstr(L"PT0S");
+			pSettings->lpVtbl->put_StartWhenAvailable(pSettings, VARIANT_TRUE);
+			pSettings->lpVtbl->put_DisallowStartIfOnBatteries(pSettings, VARIANT_FALSE);
+			pSettings->lpVtbl->put_StopIfGoingOnBatteries(pSettings, VARIANT_FALSE);
+			pSettings->lpVtbl->put_AllowHardTerminate(pSettings, VARIANT_TRUE);
+			pSettings->lpVtbl->put_ExecutionTimeLimit(pSettings, bstrTimeLimit);
+			SysFreeString(bstrTimeLimit);
+			pSettings->lpVtbl->Release(pSettings);
+		}
+
+		hr = pTaskDef->lpVtbl->get_Triggers(pTaskDef, &pTriggerColl);
+		if (SUCCEEDED(hr))
+		{
+			hr = pTriggerColl->lpVtbl->Create(pTriggerColl, TASK_TRIGGER_LOGON, &pTrigger);
+			if (SUCCEEDED(hr))
 			{
-				result = RegSetValueExW(hKey, L"gnwinfo", 0, REG_SZ, 
-					(LPBYTE)quoted_path, (DWORD)((wcslen(quoted_path) + 1) * sizeof(WCHAR)));
-				
-				if (result == ERROR_SUCCESS)
-				{
-					NWL_Debug("AUTOSTART", "Set: Success writing to %ls", reg_path);
-					RegFlushKey(hKey);
-				}
+				BSTR bstrTriggerId = alloc_bstr(L"LogonTrigger");
+				pTrigger->lpVtbl->put_Id(pTrigger, bstrTriggerId);
+				SysFreeString(bstrTriggerId);
+				pTrigger->lpVtbl->Release(pTrigger);
 			}
-			else
+			pTriggerColl->lpVtbl->Release(pTriggerColl);
+		}
+
+		hr = pTaskDef->lpVtbl->get_Actions(pTaskDef, &pActionColl);
+		if (SUCCEEDED(hr))
+		{
+			hr = pActionColl->lpVtbl->Create(pActionColl, TASK_ACTION_EXEC, &pAction);
+			if (SUCCEEDED(hr))
 			{
-				result = RegDeleteValueW(hKey, L"gnwinfo");
-				if (result == ERROR_SUCCESS || result == ERROR_FILE_NOT_FOUND)
+				hr = pAction->lpVtbl->QueryInterface(pAction, &IID_IExecAction, (void**)&pExecAction);
+				if (SUCCEEDED(hr))
 				{
-					RegFlushKey(hKey);
+					BSTR bstrPath = alloc_bstr(path);
+					pExecAction->lpVtbl->put_Path(pExecAction, bstrPath);
+					SysFreeString(bstrPath);
+					pExecAction->lpVtbl->Release(pExecAction);
 				}
+				pAction->lpVtbl->Release(pAction);
 			}
-			
-			RegCloseKey(hKey);
+			pActionColl->lpVtbl->Release(pActionColl);
+		}
+
+		BSTR bstrTaskName = alloc_bstr(AUTOSTART_TASK_NAME);
+		VARIANT varUser;
+		init_variant(&varUser);
+		hr = pRootFolder->lpVtbl->RegisterTaskDefinition(
+			pRootFolder,
+			bstrTaskName,
+			pTaskDef,
+			TASK_CREATE_OR_UPDATE,
+			varEmpty,
+			varEmpty,
+			TASK_LOGON_INTERACTIVE_TOKEN,
+			varUser,
+			&pTask);
+		SysFreeString(bstrTaskName);
+
+		pTaskDef->lpVtbl->Release(pTaskDef);
+
+		if (SUCCEEDED(hr))
+		{
+			NWL_Debug("AUTOSTART", "Set: Task created successfully");
+			if (pTask)
+				pTask->lpVtbl->Release(pTask);
+		}
+		else
+		{
+			NWL_Debug("AUTOSTART", "Set: RegisterTaskDefinition failed: 0x%08X", hr);
+		}
+
+		goto cleanup;
+create_fail:
+		pRootFolder->lpVtbl->Release(pRootFolder);
+		pService->lpVtbl->Release(pService);
+		CoUninitialize();
+		if (show_message)
+			MessageBoxW(NULL, L"?????????????????", L"??????????", MB_OK | MB_ICONERROR);
+		return;
+	}
+	else
+	{
+		BSTR bstrTaskName = alloc_bstr(AUTOSTART_TASK_NAME);
+		hr = pRootFolder->lpVtbl->DeleteTask(pRootFolder, bstrTaskName, 0);
+		SysFreeString(bstrTaskName);
+		
+		if (SUCCEEDED(hr) || hr == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND))
+		{
+			NWL_Debug("AUTOSTART", "Set: Task deleted or not found");
+		}
+		else
+		{
+			NWL_Debug("AUTOSTART", "Set: DeleteTask failed: 0x%08X", hr);
 		}
 	}
-	
+
+cleanup:
+	pRootFolder->lpVtbl->Release(pRootFolder);
+	pService->lpVtbl->Release(pService);
+	CoUninitialize();
+
 	if (show_message)
 	{
 		if (enable)
 		{
-			MessageBoxW(NULL, L"自启动设置成功！", L"自启动设置", MB_OK | MB_ICONINFORMATION);
+			MessageBoxW(NULL, L"自动启动设置成功！\n\n已创建任务计划程序任务\n将在用户登录时以管理员权限自动运行。", L"自动启动设置", MB_OK | MB_ICONINFORMATION);
 		}
 		else
 		{
-			MessageBoxW(NULL, L"已删除自启动项", L"自启动设置", MB_OK | MB_ICONINFORMATION);
+			MessageBoxW(NULL, L"已删除自动启动任务", L"自动启动设置", MB_OK | MB_ICONINFORMATION);
 		}
 	}
 }
