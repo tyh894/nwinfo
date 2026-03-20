@@ -321,7 +321,7 @@ DDR3Voltage(UINT8* rawSpd)
 		add_slash = true;
 	}
 	if (!add_slash)
-		strncpy_s(str, sizeof(str), "UNKNOWN", _TRUNCATE);
+		strcpy_s(str, sizeof(str), "UNKNOWN");
 	return str;
 }
 

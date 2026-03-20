@@ -7,7 +7,7 @@ static const char*
 lang_pt_br[N__MAX_] =
 {
 	[N__FONT_] = u8"Consolas", // The font name used in the GUI, should not be translated
-	[N__LANG_NAME_] = u8"Português", // Português (Brasil)
+	[N__LANG_NAME_] = u8"Português (Brasil)", // The language name used in the GUI
 	[N__LOADING] = u8"Carregando",
 	[N__PLS_WAIT] = u8"Aguarde ...",
 	[N__OS] = u8"SO", // Sistema Operacional
@@ -113,11 +113,9 @@ lang_pt_br[N__MAX_] =
 	[N__SHOW_SENSITIVE_DATA] = u8"Exibir dados sensíveis",
 	[N__DISABLE_DPI_SCALING] = u8"Desativar escala de DPI",
 	[N__DISABLE_ANTIALIASING] = u8"Desativar antialiasing",
-	[N__FONT_NAME] = u8"Fonte",
-	[N__FONT_SIZE] = u8"Tamanho da Fonte",
-	[N__WIDTH] = u8"Largura",
-	[N__HEIGHT] = u8"Altura",
-	[N__ALPHA] = u8"Alfa",
+	[N__WIDTH] = u8"#Largura",
+	[N__HEIGHT] = u8"#Altura",
+	[N__ALPHA] = u8"#Alfa",
 	[N__COLOR] = u8"Cor",
 	[N__SAVE] = u8"Salvar",
 	[N__NO_DISKS_FOUND] = u8"Nenhum disco encontrado",

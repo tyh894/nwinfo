@@ -4,8 +4,8 @@
 
 #define GNWINFO_TRANSPARENT
 
-#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <shellapi.h>
 #include <stdio.h>
 #include <string.h>
 #include <limits.h>
@@ -28,6 +28,11 @@
 #include "resource.h"
 
 #include <audio.h>
+
+#define ID_TRAY_ICON 1001
+#define WM_TRAYMESSAGE (WM_USER + 100)
+#define ID_TRAY_EXIT 2001
+#define ID_TRAY_SHOW 2002
 
 #define TEMP_CELSIUS_SYMBOL u8"\u00b0C" // \u2103 or \u00b0C
 
@@ -175,14 +180,14 @@ extern unsigned int g_init_width;
 extern unsigned int g_init_height;
 extern unsigned int g_init_alpha;
 extern GdipFont* g_font;
-extern char g_font_name[NWL_STR_SIZE];
 extern int g_font_size;
-extern int g_font_size_cached;
 extern double g_dpi_factor;
-extern float g_col_height;
 extern nk_bool g_dpi_scaling;
 extern nk_bool g_bginfo;
 extern nk_bool g_debug;
+extern nk_bool g_autostart;
+extern nk_bool g_tray_created;
+extern NOTIFYICONDATAW g_nid;
 
 #define NK_COLOR_YELLOW     {0xFF, 0xEA, 0x00, 0xFF}
 #define NK_COLOR_RED        {0xFF, 0x17, 0x44, 0xFF}
@@ -230,3 +235,7 @@ void gnwinfo_set_ini_value(LPCWSTR section, LPCWSTR key, LPCWSTR _Printf_format_
 LPCSTR gnwinfo_get_smbios_attr(LPCSTR type, LPCSTR key, PVOID ctx, BOOL(*cond)(PNODE node, PVOID ctx));
 struct nk_color gnwinfo_get_color(double value, double warn, double err);
 void gnwinfo_draw_percent_prog(struct nk_context* ctx, double percent);
+
+nk_bool gnwinfo_get_autostart(void);
+void gnwinfo_set_autostart(nk_bool enable);
+void gnwinfo_set_autostart_internal(nk_bool enable, nk_bool show_message);

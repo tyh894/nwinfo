@@ -30,7 +30,7 @@ static void draw_pci_node(struct nk_context* ctx, PNODE node)
 
 void draw_pci_class(struct nk_context* ctx, const char* title, struct nk_image image, const char* code)
 {
-	if (nk_tree_image_push_id(ctx, NK_TREE_TAB, image, title, NK_MINIMIZED, tree_id++))
+	if (g_ctx.pci && nk_tree_image_push_id(ctx, NK_TREE_TAB, image, title, NK_MINIMIZED, tree_id++))
 	{
 		INT count = NWL_NodeChildCount(g_ctx.pci);
 		for (INT i = 0; i < count; i++)
@@ -75,7 +75,7 @@ VOID gnwinfo_draw_pci_window(struct nk_context* ctx, float width, float height)
 	draw_pci_class(ctx, "Intelligent controller", GET_PNG(IDR_PNG_PCI), "0e");
 	draw_pci_class(ctx, "Satellite communications controller", GET_PNG(IDR_PNG_WLAN), "0f");
 	draw_pci_class(ctx, "Encryption controller", GET_PNG(IDR_PNG_FIRMWARE), "10");
-	if (nk_tree_image_push_id(ctx, NK_TREE_TAB, GET_PNG(IDR_PNG_PCI), "Other", NK_MINIMIZED, tree_id++))
+	if (g_ctx.pci && nk_tree_image_push_id(ctx, NK_TREE_TAB, GET_PNG(IDR_PNG_PCI), "Other", NK_MINIMIZED, tree_id++))
 	{
 		INT count = NWL_NodeChildCount(g_ctx.pci);
 		for (INT i = 0; i < count; i++)

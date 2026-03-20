@@ -7,7 +7,7 @@ static const char*
 lang_pl_pl[N__MAX_] =
 {
 	[N__FONT_] = u8"Consolas", // Nazwa czcionki używanej w GUI, nie tłumaczyć
-	[N__LANG_NAME_] = u8"Polski", // Nazwa języka używana w GUI
+	[N__LANG_NAME_] = u8"Polski (Polska)", // Nazwa języka używana w GUI
 	[N__LOADING] = u8"Wczytywanie",
 	[N__PLS_WAIT] = u8"Proszę czekać ...",
 	[N__OS] = u8"System operacyjny",
@@ -113,11 +113,9 @@ lang_pl_pl[N__MAX_] =
 	[N__SHOW_SENSITIVE_DATA] = u8"Pokaż dane wrażliwe",
 	[N__DISABLE_DPI_SCALING] = u8"Wyłącz skalowanie DPI",
 	[N__DISABLE_ANTIALIASING] = u8"Wyłącz antyaliasing",
-	[N__FONT_NAME] = u8"Czcionka",
-	[N__FONT_SIZE] = u8"Rozmiar czcionki",
-	[N__WIDTH] = u8"Szerokość",
-	[N__HEIGHT] = u8"Wysokość",
-	[N__ALPHA] = u8"Alfa",
+	[N__WIDTH] = u8"#Szerokość", // nie usuwać znaku '#'
+	[N__HEIGHT] = u8"#Wysokość", // nie usuwać znaku '#'
+	[N__ALPHA] = u8"#Alfa", // nie usuwać znaku '#'
 	[N__COLOR] = u8"Kolor",
 	[N__SAVE] = u8"Zapisz",
 	[N__NO_DISKS_FOUND] = u8"Nie znaleziono dysków",

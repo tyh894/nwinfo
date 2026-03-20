@@ -71,135 +71,29 @@ draw_color_picker(struct nk_context* ctx, struct nk_color* color)
 	}
 }
 
-static void
-nk_font_list(struct nk_context* ctx, float item_height)
-{
-	struct nk_vec2 size;
-
-	size.y = 8 * (item_height + ctx->style.window.spacing.y);
-	size.y += ctx->style.window.spacing.y * 2 + ctx->style.window.combo_padding.y * 2;
-	size.x = nk_widget_width(ctx);
-
-	if (nk_combo_begin_text(ctx, g_font_name, nk_strlen(g_font_name), size))
-	{
-		PNODE node = NW_Font(FALSE);
-		INT count = NWL_NodeChildCount(node);
-		nk_layout_row_dynamic(ctx, item_height, 1);
-		for (INT i = 0; i < count; i++)
-		{
-			PNODE item = NWL_NodeEnumChild(node, i);
-			if (!item)
-				continue;
-			const char* name = NWL_NodeAttrGet(item, "Name");
-			if (name[0] == '@')
-				continue;
-			if (nk_combo_item_label(ctx, name, NK_TEXT_LEFT))
-				strncpy_s(g_font_name, NWL_STR_SIZE, name, _TRUNCATE);
-		}
-		nk_combo_end(ctx);
-		NWL_NodeFree(node, 1);
-	}
-}
-
-static void
-nk_lang_list(struct nk_context* ctx, float item_height)
-{
-	struct nk_vec2 size;
-
-	size.y = 8 * (item_height + ctx->style.window.spacing.y);
-	size.y += ctx->style.window.spacing.y * 2 + ctx->style.window.combo_padding.y * 2;
-	size.x = nk_widget_width(ctx);
-
-	const char* lang_name = N_(N__LANG_NAME_);
-	if (nk_combo_begin_text(ctx, lang_name, nk_strlen(lang_name), size))
-	{
-		nk_layout_row_dynamic(ctx, item_height, 1);
-		for (size_t i = 0; i < g_supported_lang_num; i++)
-		{
-			LANGID lang = g_supported_lang_ids[i];
-			const char* name = gnwinfo_get_lang_str(lang, N__LANG_NAME_);
-			if (nk_combo_item_label(ctx, name, NK_TEXT_LEFT))
-				g_lang_id = lang;
-		}
-		nk_combo_end(ctx);
-	}
-}
-
 VOID
 gnwinfo_draw_settings_window(struct nk_context* ctx, float width, float height)
 {
 	if (!(g_ctx.window_flag & GUI_WINDOW_SETTINGS))
 		return;
+	
+	static int last_window_was_open = 0;
+	if (!last_window_was_open)
+	{
+		last_window_was_open = 1;
+		nk_bool registry_state = gnwinfo_get_autostart();
+		g_autostart = !registry_state;
+	}
+	
 	if (!nk_begin_ex(ctx, N_(N__SETTINGS),
-		nk_rect(width / 6.0f, height / 6.0f, width * 2.0f / 3.0f, height * 2.0f / 3.0f),
+		nk_rect(width / 4.0f, height / 3.0f, width / 2.0f, height / 3.0f),
 		NK_WINDOW_BORDER | NK_WINDOW_MOVABLE | NK_WINDOW_SCALABLE | NK_WINDOW_CLOSABLE,
 		GET_PNG(IDR_PNG_SETTINGS), GET_PNG(IDR_PNG_CLOSE)))
 	{
 		g_ctx.window_flag &= ~GUI_WINDOW_SETTINGS;
+		last_window_was_open = 0;
 		goto out;
 	}
-
-	nk_layout_row_dynamic(ctx, 0, 1);
-	set_label(ctx, N_(N__WINDOW_RESTART));
-	nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.1f, 0.9f });
-	nk_spacer(ctx);
-	nk_checkbox_label(ctx, N_(N__BACKGROUND_INFO), &g_ctx.gui_bginfo);
-	nk_spacer(ctx);
-	nk_checkbox_flags_label(ctx, N_(N__NO_QUICK_ACCESS), &g_ctx.main_flag, MAIN_NO_QUICK);
-	nk_spacer(ctx);
-	nk_checkbox_label(ctx, N_(N__SHOW_SENSITIVE_DATA), &g_ctx.lib.HideSensitive);
-	nk_spacer(ctx);
-	nk_checkbox_label(ctx, N_(N__DISABLE_DPI_SCALING), &g_dpi_scaling);
-	nk_spacer(ctx);
-	nk_checkbox_label(ctx, N_(N__DISABLE_ANTIALIASING), &g_ctx.gui_aa);
-
-	nk_layout_row(ctx, NK_DYNAMIC, g_col_height, 3, (float[3]) { 0.1f, 0.4f, 0.5f });
-	nk_spacer(ctx);
-	set_label(ctx, "Language");
-	nk_lang_list(ctx, g_col_height);
-
-	nk_spacer(ctx);
-	set_label(ctx, N_(N__FONT_NAME));
-	nk_font_list(ctx, g_col_height);
-
-	nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.1f, 0.4f, 0.5f });
-	nk_spacer(ctx);
-	set_label(ctx, N_(N__FONT_SIZE));
-	nk_property_int(ctx, "#", 4, &g_font_size_cached, 128, 1, 2);
-	nk_spacer(ctx);
-	set_label(ctx, N_(N__WIDTH));
-	nk_property_int(ctx, "#", 60, &g_init_width, 1920, 10, 10);
-	nk_spacer(ctx);
-	set_label(ctx, N_(N__HEIGHT));
-	nk_property_int(ctx, "#", 80, &g_init_height, 1080, 10, 10);
-	nk_spacer(ctx);
-	set_label(ctx, N_(N__ALPHA));
-	nk_property_int(ctx, "#", 10, &g_init_alpha, 255, 5, 10);
-
-	nk_layout_row_dynamic(ctx, 0, 1);
-	set_label(ctx, N_(N__COLOR));
-	nk_layout_row(ctx, NK_DYNAMIC, 25, 3, (float[3]) { 0.1f, 0.4f, 0.5f });
-	nk_spacer(ctx);
-	set_label(ctx, "BACKGROUND");
-	draw_color_picker(ctx, &g_color_back);
-	nk_spacer(ctx);
-	set_label(ctx, "HIGHLIGHT");
-	draw_color_picker(ctx, &g_color_text_l);
-	nk_spacer(ctx);
-	set_label(ctx, "DEFAULT");
-	draw_color_picker(ctx, &g_color_text_d);
-	nk_spacer(ctx);
-	set_label(ctx, "STATE GOOD");
-	draw_color_picker(ctx, &g_color_good);
-	nk_spacer(ctx);
-	set_label(ctx, "STATE WARN");
-	draw_color_picker(ctx, &g_color_warning);
-	nk_spacer(ctx);
-	set_label(ctx, "STATE ERROR");
-	draw_color_picker(ctx, &g_color_error);
-	nk_spacer(ctx);
-	set_label(ctx, "STATE UNKNOWN");
-	draw_color_picker(ctx, &g_color_unknown);
 
 	nk_layout_row_dynamic(ctx, 0, 1);
 	set_label(ctx, N_(N__HIDE_COMPONENTS));
@@ -323,6 +217,54 @@ gnwinfo_draw_settings_window(struct nk_context* ctx, float width, float height)
 	nk_spacer(ctx);
 	nk_checkbox_flags_label(ctx, N_(N__HIDE_RAID_VOLUME), &g_ctx.smart_flag, CDI_FLAG_HIDE_RAID_VOLUME);
 
+	nk_layout_row_dynamic(ctx, 0, 1);
+	set_label(ctx, N_(N__WINDOW_RESTART));
+	nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.1f, 0.9f });
+	nk_spacer(ctx);
+	nk_checkbox_label(ctx, N_(N__BACKGROUND_INFO), &g_ctx.gui_bginfo);
+	nk_spacer(ctx);
+	nk_checkbox_flags_label(ctx, N_(N__NO_QUICK_ACCESS), &g_ctx.main_flag, MAIN_NO_QUICK);
+
+	nk_spacer(ctx);
+	nk_checkbox_label(ctx, N_(N__SHOW_SENSITIVE_DATA), &g_ctx.lib.HideSensitive);
+	nk_spacer(ctx);
+	nk_checkbox_label(ctx, N_(N__DISABLE_DPI_SCALING), &g_dpi_scaling);
+	nk_spacer(ctx);
+	nk_checkbox_label(ctx, N_(N__DISABLE_ANTIALIASING), &g_ctx.gui_aa);
+	nk_spacer(ctx);
+	nk_checkbox_label(ctx, N_(N__AUTOSTART), &g_autostart);
+	nk_spacer(ctx);
+	nk_property_int(ctx, N_(N__WIDTH), 60, &g_init_width, 1920, 10, 10);
+	nk_spacer(ctx);
+	nk_property_int(ctx, N_(N__HEIGHT), 80, &g_init_height, 1080, 10, 10);
+	nk_spacer(ctx);
+	nk_property_int(ctx, N_(N__ALPHA), 10, &g_init_alpha, 255, 5, 10);
+
+	nk_layout_row_dynamic(ctx, 0, 1);
+	set_label(ctx, N_(N__COLOR));
+	nk_layout_row(ctx, NK_DYNAMIC, 25, 3, (float[3]) { 0.1f, 0.4f, 0.5f });
+	nk_spacer(ctx);
+	set_label(ctx, "BACKGROUND");
+	draw_color_picker(ctx, &g_color_back);
+	nk_spacer(ctx);
+	set_label(ctx, "HIGHLIGHT");
+	draw_color_picker(ctx, &g_color_text_l);
+	nk_spacer(ctx);
+	set_label(ctx, "DEFAULT");
+	draw_color_picker(ctx, &g_color_text_d);
+	nk_spacer(ctx);
+	set_label(ctx, "STATE GOOD");
+	draw_color_picker(ctx, &g_color_good);
+	nk_spacer(ctx);
+	set_label(ctx, "STATE WARN");
+	draw_color_picker(ctx, &g_color_warning);
+	nk_spacer(ctx);
+	set_label(ctx, "STATE ERROR");
+	draw_color_picker(ctx, &g_color_error);
+	nk_spacer(ctx);
+	set_label(ctx, "STATE UNKNOWN");
+	draw_color_picker(ctx, &g_color_unknown);
+
 	nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.8f, 0.2f });
 	nk_spacer(ctx);
 	if (nk_button_label(ctx, N_(N__SAVE)))
@@ -337,10 +279,9 @@ gnwinfo_draw_settings_window(struct nk_context* ctx, float width, float height)
 		gnwinfo_set_ini_value(L"Window", L"HideSensitive", L"%u", g_ctx.lib.HideSensitive);
 		gnwinfo_set_ini_value(L"Window", L"DpiScaling", L"%d", g_dpi_scaling);
 		gnwinfo_set_ini_value(L"Window", L"AntiAliasing", L"%u", g_ctx.gui_aa);
-		gnwinfo_set_ini_value(L"Window", L"Language", L"%u", g_lang_id);
-		if (g_font_name[0] != '\0')
-			gnwinfo_set_ini_value(L"Window", L"Font", L"%s", NWL_Utf8ToUcs2(g_font_name));
-		gnwinfo_set_ini_value(L"Window", L"FontSize", L"%d", g_font_size_cached);
+		nk_bool actual_enable = !g_autostart;
+		gnwinfo_set_ini_value(L"Window", L"AutoStart", L"%d", actual_enable);
+		gnwinfo_set_autostart_internal(actual_enable, nk_false);
 		set_ini_color(L"Background", g_color_back);
 		set_ini_color(L"Highlight", g_color_text_l);
 		set_ini_color(L"Default", g_color_text_d);
@@ -349,6 +290,7 @@ gnwinfo_draw_settings_window(struct nk_context* ctx, float width, float height)
 		set_ini_color(L"StateError", g_color_error);
 		set_ini_color(L"StateUnknown", g_color_unknown);
 		g_ctx.window_flag &= ~GUI_WINDOW_SETTINGS;
+		last_window_was_open = 0;
 	}
 out:
 	nk_end(ctx);

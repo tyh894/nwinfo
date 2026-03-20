@@ -230,7 +230,7 @@ fail:
 	return smbios_len + sizeof(struct RAW_SMBIOS_DATA);
 }
 
-UINT
+static UINT
 NWL_GetSystemFirmwareTable(DWORD FirmwareTableProviderSignature, DWORD FirmwareTableID,
 	PVOID pFirmwareTableBuffer, DWORD BufferSize)
 {
@@ -393,40 +393,23 @@ NWL_GetXsdt(VOID)
 	return ret;
 }
 
-PVOID NWL_GetAcpiByAddr(DWORD_PTR Addr, DWORD TableId)
+PVOID NWL_GetAcpiByAddr(DWORD_PTR Addr)
 {
 	PVOID ret;
-	union
-	{
-		DESC_HEADER hdr;
-		uint32_t raw[sizeof(DESC_HEADER) / sizeof(uint32_t)];
-	} tmp;
+	DESC_HEADER tmp;
 	if (!Addr)
 		return NULL;
-	for (size_t i = 0; i < sizeof(DESC_HEADER); i += sizeof(uint32_t))
-	{
-		if (WR0_RdMmIo(NWLC->NwDrv, Addr + i, &tmp.raw[i / sizeof(uint32_t)], sizeof(uint32_t)) != 0)
-			return NULL;
-	}
-	if (TableId && TableId != ACPI_SIG(tmp.hdr.Signature[0], tmp.hdr.Signature[1], tmp.hdr.Signature[2], tmp.hdr.Signature[3]))
+	if (!NWL_ReadMemory(&tmp, Addr, sizeof(DESC_HEADER)))
 		return NULL;
-	if (tmp.hdr.Length < sizeof(DESC_HEADER))
-		return NULL;
-	ret = malloc(tmp.hdr.Length);
+	if (tmp.Length < sizeof(DESC_HEADER))
+		tmp.Length = sizeof(DESC_HEADER);
+	ret = malloc(tmp.Length);
 	if (!ret)
 		return NULL;
-
-	memcpy(ret, &tmp, sizeof(tmp));
-
-	for (size_t i = 0; i < tmp.hdr.Length - sizeof(DESC_HEADER); i++)
+	if (!NWL_ReadMemory(ret, Addr, tmp.Length))
 	{
-		uint8_t val;
-		if (WR0_RdMmIo(NWLC->NwDrv, Addr + sizeof(DESC_HEADER) + i, &val, sizeof(val)) != 0)
-		{
-			free(ret);
-			return NULL;
-		}
-		memcpy(((uint8_t*)ret) + sizeof(DESC_HEADER) + i, &val, sizeof(val));
+		free(ret);
+		return NULL;
 	}
 	return ret;
 }

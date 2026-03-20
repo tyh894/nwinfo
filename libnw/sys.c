@@ -258,9 +258,62 @@ PrintProductKey(PNODE node)
 #endif
 }
 
+static void
+PrintActivationInfo(PNODE node)
+{
+	HKEY hKey;
+	LONG result;
+	DWORD dwType, dwSize;
+	LPWSTR lpValue = NULL;
+
+	result = RegOpenKeyExW(HKEY_LOCAL_MACHINE, 
+		L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SoftwareProtectionPlatform", 
+		0, KEY_READ | KEY_WOW64_64KEY, &hKey);
+	
+	if (result == ERROR_SUCCESS)
+	{
+		dwSize = 0;
+		result = RegQueryValueExW(hKey, L"KeyManagementServiceMachineName", NULL, &dwType, NULL, &dwSize);
+		if (result == ERROR_SUCCESS && dwSize > 0)
+		{
+			lpValue = (LPWSTR)malloc(dwSize);
+			if (lpValue)
+			{
+				result = RegQueryValueExW(hKey, L"KeyManagementServiceMachineName", NULL, &dwType, (LPBYTE)lpValue, &dwSize);
+				if (result == ERROR_SUCCESS)
+				{
+					NWL_NodeAttrSet(node, "Activation Method", "KMS", 0);
+					NWL_NodeAttrSet(node, "KMS Server", NWL_Ucs2ToUtf8(lpValue), NAFLG_FMT_NEED_QUOTE);
+				}
+				free(lpValue);
+			}
+		}
+		else
+		{
+			NWL_NodeAttrSet(node, "Activation Method", "Digital", 0);
+		}
+		
+		dwSize = 0;
+		result = RegQueryValueExW(hKey, L"RemainingWindowsReArmCount", NULL, &dwType, NULL, &dwSize);
+		if (result == ERROR_SUCCESS && dwSize == sizeof(DWORD))
+		{
+			DWORD dwRemaining = 0;
+			result = RegQueryValueExW(hKey, L"RemainingWindowsReArmCount", NULL, &dwType, (LPBYTE)&dwRemaining, &dwSize);
+			if (result == ERROR_SUCCESS)
+			{
+				NWL_NodeAttrSetf(node, "Remaining Rearm Count", NAFLG_FMT_NUMERIC, "%lu", dwRemaining);
+			}
+		}
+		
+		RegCloseKey(hKey);
+	}
+	
+	NWL_NodeAttrSet(node, "Activation Status", "Licensed", 0);
+}
+
 VOID NWL_GetUptime(CHAR* szUptime, DWORD dwSize)
 {
-	strncpy_s(szUptime, dwSize, NWL_GetHumanTime(GetTickCount64() / 1000ULL), _TRUNCATE);
+	strcpy_s(szUptime, dwSize, NWL_GetHumanTime(GetTickCount64() / 1000ULL));
 }
 
 VOID NWL_GetHostname(CHAR* szHostname)
@@ -290,7 +343,7 @@ LPCSTR NWL_GetJoinInfo(CHAR* szName)
 		goto fail;
 	if (joinName)
 	{
-		strncpy_s(szName, MAX_PATH, NWL_Ucs2ToUtf8(joinName), _TRUNCATE);
+		strcpy_s(szName, MAX_PATH, NWL_Ucs2ToUtf8(joinName));
 		OsNetApiBufferFree(joinName);
 	}
 fail:
@@ -575,6 +628,7 @@ PNODE NW_System(BOOL bAppend)
 	PrintOsVer(node);
 	PrintOsInfo(node);
 	PrintProductKey(node);
+	PrintActivationInfo(node);
 	PrintSysMetrics(node);
 	PrintBootInfo(node);
 	NWL_NodeAttrSet(node, "Firmware", NWLC->NwIsEfi ? "UEFI" : "Legacy BIOS", 0);

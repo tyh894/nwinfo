@@ -242,7 +242,7 @@ NWL_GetEfiDpStr(EFI_DEVICE_PATH* pDp)
 				switch (pDpPtr.HardDrive->SignatureType)
 				{
 				case NO_DISK_SIGNATURE:
-					strncpy_s(cchSignature, sizeof(cchSignature), "0", _TRUNCATE);
+					strcpy_s(cchSignature, sizeof(cchSignature), "0");
 					break;
 				case SIGNATURE_TYPE_MBR:
 					snprintf(cchSignature, sizeof(cchSignature), "%02X%02X%02X%02X",
@@ -252,10 +252,10 @@ NWL_GetEfiDpStr(EFI_DEVICE_PATH* pDp)
 						pDpPtr.HardDrive->Signature[3]);
 					break;
 				case SIGNATURE_TYPE_GUID:
-					strncpy_s(cchSignature, sizeof(cchSignature), NWL_GuidToStr(pDpPtr.HardDrive->Signature), _TRUNCATE);
+					strcpy_s(cchSignature, sizeof(cchSignature), NWL_GuidToStr(pDpPtr.HardDrive->Signature));
 					break;
 				default:
-					strncpy_s(cchSignature, sizeof(cchSignature), "Unknown", _TRUNCATE);
+					strcpy_s(cchSignature, sizeof(cchSignature), "Unknown");
 					break;
 				}
 				switch (pDpPtr.HardDrive->MBRType)

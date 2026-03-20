@@ -62,18 +62,45 @@ draw_os(struct nk_context* ctx)
 		nk_lhsc(ctx, N_(N__UPTIME), NK_TEXT_LEFT, g_color_text_d, nk_false, nk_true);
 		nk_lhc(ctx, g_ctx.sys_uptime, NK_TEXT_LEFT, g_color_text_l);
 	}
+
+	if (g_ctx.system)
+	{
+		LPCSTR activation_status = NWL_NodeAttrGet(g_ctx.system, "Activation Status");
+		LPCSTR activation_method = NWL_NodeAttrGet(g_ctx.system, "Activation Method");
+		if (activation_status && activation_status[0] != '\0' && activation_status[0] != '-')
+		{
+			nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.3f, 0.7f });
+			nk_lhsc(ctx, u8"激活状态", NK_TEXT_LEFT, g_color_text_d, nk_false, nk_true);
+			nk_lhc(ctx, activation_status, NK_TEXT_LEFT, g_color_text_l);
+
+			if (activation_method && activation_method[0] != '\0' && activation_method[0] != '-')
+			{
+				nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.3f, 0.7f });
+				nk_lhsc(ctx, u8"激活方式", NK_TEXT_LEFT, g_color_text_d, nk_false, nk_true);
+				nk_lhc(ctx, activation_method, NK_TEXT_LEFT, g_color_text_l);
+			}
+
+			LPCSTR kms_server = NWL_NodeAttrGet(g_ctx.system, "KMS Server");
+			if (kms_server && kms_server[0] != '\0' && kms_server[0] != '-')
+			{
+				nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.3f, 0.7f });
+				nk_lhsc(ctx, u8"KMS服务器", NK_TEXT_LEFT, g_color_text_d, nk_false, nk_true);
+				nk_lhc(ctx, kms_server, NK_TEXT_LEFT, g_color_text_l);
+			}
+		}
+	}
 }
 
 static VOID
 draw_bios(struct nk_context* ctx)
 {
-	LPCSTR tpm = NWL_NodeAttrGet(g_ctx.system, "TPM");
-	LPCSTR sb = NWL_NodeAttrGet(g_ctx.uefi, "Secure Boot");
+	LPCSTR tpm = g_ctx.system ? NWL_NodeAttrGet(g_ctx.system, "TPM") : "-";
+	LPCSTR sb = g_ctx.uefi ? NWL_NodeAttrGet(g_ctx.uefi, "Secure Boot") : "-";
 
 	nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.3f, 0.7f - g_ctx.gui_ratio, g_ctx.gui_ratio });
 	nk_image_label(ctx, GET_PNG(IDR_PNG_FIRMWARE), N_(N__BIOS), NK_TEXT_LEFT, g_color_text_d);
 
-	int len = snprintf(m_buf, MAX_PATH, "%s", NWL_NodeAttrGet(g_ctx.system, "Firmware"));
+	int len = snprintf(m_buf, MAX_PATH, "%s", g_ctx.system ? NWL_NodeAttrGet(g_ctx.system, "Firmware") : "Unknown");
 	if (sb[0] == 'E' && len >= 0 && len < MAX_PATH)
 		len += snprintf(m_buf + len, MAX_PATH - len, " %s", N_(N__SB));
 	else if (sb[0] == 'D' && len >= 0 && len < MAX_PATH)
@@ -126,11 +153,14 @@ draw_computer(struct nk_context* ctx)
 		gnwinfo_get_smbios_attr("3", "Type", NULL, NULL),
 		gnwinfo_get_smbios_attr("1", "Serial Number", NULL, NULL));
 
-	nk_lhsc(ctx, NWL_NodeAttrGet(g_ctx.board, "Manufacturer"), NK_TEXT_LEFT, g_color_text_d, nk_true, nk_true);
-	nk_lhcf(ctx, NK_TEXT_LEFT, g_color_text_l,
-		"%s %s",
-		NWL_NodeAttrGet(g_ctx.board, "Board Name"),
-		NWL_NodeAttrGet(g_ctx.board, "Serial Number"));
+	if (g_ctx.board)
+	{
+		nk_lhsc(ctx, NWL_NodeAttrGet(g_ctx.board, "Manufacturer"), NK_TEXT_LEFT, g_color_text_d, nk_true, nk_true);
+		nk_lhcf(ctx, NK_TEXT_LEFT, g_color_text_l,
+			"%s %s",
+			NWL_NodeAttrGet(g_ctx.board, "Board Name"),
+			NWL_NodeAttrGet(g_ctx.board, "Serial Number"));
+	}
 
 	if (strcmp(bat, "Charging") == 0)
 	{
@@ -767,13 +797,24 @@ draw_audio(struct nk_context* ctx)
 VOID
 gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 {
+	struct nk_window* win;
+	const char* title = "NWinfo GUI";
+	for (win = ctx->begin; win != NULL; win = win->next)
+	{
+		if (strcmp(win->name_string, title) == 0)
+		{
+			win->flags &= ~NK_WINDOW_HIDDEN;
+			break;
+		}
+	}
 	if (!nk_begin_ex(ctx, "NWinfo GUI",
 		nk_rect(0, 0, width, height),
 		g_bginfo ? NK_WINDOW_BACKGROUND : (NK_WINDOW_BACKGROUND | NK_WINDOW_CLOSABLE | NK_WINDOW_TITLE),
 		nk_image_id(0), GET_PNG(IDR_PNG_CLOSE)))
 	{
 		nk_end(ctx);
-		InterlockedExchange(&g_ctx.exit_pending, 1);
+		//InterlockedExchange(&g_ctx.exit_pending, 1);
+		ShowWindow(g_ctx.wnd, SW_HIDE);
 		return;
 	}
 

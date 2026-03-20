@@ -314,7 +314,7 @@ static uint32_t nv_gpu_get(void* data, NWLIB_GPU_DEV* dev, uint32_t dev_count)
 		NWLIB_GPU_DEV* info = &dev[count];
 		count++;
 
-		strncpy_s(info->Name, MAX_GPU_STR, ctx->List[i].Name, _TRUNCATE);
+		strcpy_s(info->Name, MAX_GPU_STR, ctx->List[i].Name);
 		info->VendorId = (uint32_t)ctx->List[i].VendorId;
 		info->DeviceId = (uint32_t)ctx->List[i].ExtDeviceId;
 		info->Subsys = (uint32_t)ctx->List[i].Subsys;

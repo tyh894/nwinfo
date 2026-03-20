@@ -73,6 +73,9 @@ static bool find_bars(plpcio h)
 
 bool lpcio_select_slot(plpcio h, enum LPCIO_CHIP_SLOT slot)
 {
+	if (!h || !h->drv)
+		return false;
+
 	NWL_Debug("LPCIO", "Select slot %d", slot);
 
 	h->reg_port = 0;
@@ -103,6 +106,9 @@ bool lpcio_select_slot(plpcio h, enum LPCIO_CHIP_SLOT slot)
 
 bool lpcio_find_bars(plpcio h)
 {
+	if (!h || !h->drv)
+		return false;
+
 	if (h->drv->type == WR0_DRIVER_PAWNIO)
 	{
 		if (WR0_ExecPawn(h->drv, &h->drv->pio_lpcio, "ioctl_find_bars", NULL, 0, NULL, 0, NULL))
@@ -118,6 +124,9 @@ bool lpcio_find_bars(plpcio h)
 
 bool lpcio_pio_inb(plpcio h, uint16_t port, uint8_t* value)
 {
+	if (!h || !h->drv || !value)
+		return false;
+
 	if (h->drv->type == WR0_DRIVER_PAWNIO)
 	{
 		ULONG64 in = port;
@@ -138,6 +147,9 @@ bool lpcio_pio_inb(plpcio h, uint16_t port, uint8_t* value)
 
 bool lpcio_pio_outb(plpcio h, uint16_t port, uint8_t value)
 {
+	if (!h || !h->drv)
+		return false;
+
 	NWL_Debug("LPCIO", "outb 0x%04x 0x%02x", port, value);
 
 	if (h->drv->type == WR0_DRIVER_PAWNIO)
@@ -156,6 +168,9 @@ bool lpcio_pio_outb(plpcio h, uint16_t port, uint8_t value)
 
 bool lpcio_sio_inb(plpcio h, uint8_t reg, uint8_t* value)
 {
+	if (!h || !h->drv || !value)
+		return false;
+
 	if (h->drv->type == WR0_DRIVER_PAWNIO)
 	{
 		ULONG64 in = reg;
@@ -176,6 +191,9 @@ bool lpcio_sio_inb(plpcio h, uint8_t reg, uint8_t* value)
 
 bool lpcio_sio_outb(plpcio h, uint8_t reg, uint8_t value)
 {
+	if (!h || !h->drv)
+		return false;
+
 	NWL_Debug("LPCIO", "sio outb 0x%02x 0x%02x", reg, value);
 
 	if (h->drv->type == WR0_DRIVER_PAWNIO)
@@ -194,6 +212,9 @@ bool lpcio_sio_outb(plpcio h, uint8_t reg, uint8_t value)
 
 bool lpcio_sio_inw(plpcio h, uint8_t reg, uint16_t* value)
 {
+	if (!h || !h->drv || !value)
+		return false;
+
 	if (h->drv->type == WR0_DRIVER_PAWNIO)
 	{
 		ULONG64 in = reg;

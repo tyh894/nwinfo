@@ -22,7 +22,6 @@ enum
 	NW_OPT_BIN,
 	NW_OPT_DEBUG,
 	NW_OPT_HIDE_SENSITIVE,
-	NW_OPT_DRIVER,
 	NW_OPT_SYS,
 	NW_OPT_CPU,
 	NW_OPT_NET,
@@ -58,7 +57,6 @@ static struct optparse_option nwOptions[] =
 	{ "bin", 'b', OPTPARSE_REQUIRED},
 	{ "debug", 'd', OPTPARSE_NONE},
 	{ "hide-sensitive", 'i', OPTPARSE_NONE},
-	{ "driver", 's', OPTPARSE_REQUIRED},
 	{ "sys", 0, OPTPARSE_NONE },
 	{ "cpu", 0, OPTPARSE_OPTIONAL },
 	{ "net", 0, OPTPARSE_OPTIONAL },
@@ -102,7 +100,6 @@ static void nwinfo_help(void)
 		"                   FMT can be 'NONE' (default), 'BASE64' or 'HEX'.\n"
 		"  --debug          Print debug info to stdout.\n"
 		"  --hide-sensitive Hide sensitive data (MAC & S/N).\n"
-		"  --driver=NAME    Specify the driver name.\n"
 		"  --sys            Print system info.\n"
 		"  --cpu[=FILE]     Print CPUID info.\n"
 		"    FILE           Specify the file name of the CPUID dump.\n"
@@ -269,17 +266,8 @@ nwinfo_parse_arg_set(const char* arg, PNWL_ARG_SET* set, BOOL useString)
 	free(dup);
 }
 
-static void
-nwinfo_invalid_param_handler(const wchar_t* expr, const wchar_t* func, const wchar_t* file, unsigned int line, uintptr_t reserved)
-{
-	fwprintf(stderr, L"Invalid parameter in %s (line %u): %s\n", func, line, expr);
-	abort();
-}
-
 int main(int argc, char* argv[])
 {
-	_set_invalid_parameter_handler(nwinfo_invalid_param_handler);
-
 	BOOL bSetCodePage = FALSE;
 	LPCSTR lpFileName = NULL;
 	ZeroMemory(&nwContext, sizeof(NWLIB_CONTEXT));
@@ -342,9 +330,6 @@ int main(int argc, char* argv[])
 				nwContext.BinaryFormat = BIN_FMT_BASE64;
 			else if (_stricmp(options.optarg, "HEX") == 0)
 				nwContext.BinaryFormat = BIN_FMT_HEX;
-			break;
-		case NW_OPT_DRIVER:
-			nwContext.DriverName = options.optarg;
 			break;
 		case NW_OPT_SYS:
 			nwContext.SysInfo = TRUE;

@@ -360,14 +360,10 @@ struct wr0_drv_t* WR0_OpenDriver(void)
 		return NULL;
 	if (WR0_IsWoW64())
 		return NULL;
-	if (_stricmp(NWLC->DriverName, "none") == 0)
-		return NULL;
 	for (size_t i = 0; i < ARRAYSIZE(drv_list); i++)
 	{
 		struct wr0_drv_t* drv = drv_list[i];
 		ZeroMemory(drv->path, MAX_PATH);
-		if (NWLC->DriverName != NULL && _stricmp(NWLC->DriverName, NWL_Ucs2ToUtf8(drv->id)) != 0)
-			continue;
 		if (drv->load(drv))
 		{
 			NWL_Debug("DRV", "%s loaded.", NWL_Ucs2ToUtf8(drv->name));
@@ -870,9 +866,15 @@ int WR0_WrPciConf(struct wr0_drv_t* drv, uint32_t addr, uint32_t reg, void* valu
 		uint32_t ioAddr = 0x80000000U | (inBuf.Bus << 16) | (inBuf.Device << 11) | (inBuf.Function << 8) | (reg & 0xFC);
 		if (size == sizeof(DWORD))
 		{
+#if 0
+			// Use port IO
+			WR0_WrIo32(drv, 0xCF8, ioAddr);
+			WR0_WrIo32(drv, 0xCFC + (reg & 3), *(uint32_t*)value);
+#else
 			memcpy(&inBuf.Value, value, sizeof(DWORD));
 			result = DeviceIoControl(drv->handle, IOCTL_CPUZ_WRITE_PCI_CONFIG,
 				&inBuf, sizeof(inBuf), &inBuf, sizeof(inBuf), &returnedLength, NULL);
+#endif
 		}
 		else if (size == sizeof(uint16_t))
 		{
@@ -889,7 +891,6 @@ int WR0_WrPciConf(struct wr0_drv_t* drv, uint32_t addr, uint32_t reg, void* valu
 			result = TRUE;
 		}
 	}
-		break;
 	default:
 		return -1;
 	}

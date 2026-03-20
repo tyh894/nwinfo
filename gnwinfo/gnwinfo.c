@@ -16,15 +16,165 @@ unsigned int g_init_height = 800;
 unsigned int g_init_alpha = 255;
 GdipFont* g_font = NULL;
 int g_font_size = 12;
-int g_font_size_cached = 0;
-char g_font_name[NWL_STR_SIZE] = "-";
 double g_dpi_factor = 1.0;
-float g_col_height = 0;
 nk_bool g_dpi_scaling = 1;
 nk_bool g_bginfo = 0;
 nk_bool g_debug = 0;
 
+nk_bool g_tray_created = 0;
+nk_bool g_autostart = 0;
+NOTIFYICONDATAW g_nid;
+
 static UINT m_dpi = USER_DEFAULT_SCREEN_DPI;
+
+nk_bool gnwinfo_get_autostart(void)
+{
+	HKEY hKey;
+	LONG result;
+	WCHAR path[MAX_PATH];
+	DWORD size;
+	DWORD type;
+	nk_bool found = nk_false;
+
+	const WCHAR* registry_paths[] = {
+		L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run"
+	};
+	int num_paths = 1;
+
+	for (int i = 0; i < num_paths && !found; i++)
+	{
+		const WCHAR* reg_path = registry_paths[i];
+		result = RegOpenKeyExW(HKEY_CURRENT_USER, reg_path, 0, KEY_READ, &hKey);
+		if (result == ERROR_SUCCESS)
+		{
+			size = sizeof(path);
+			result = RegQueryValueExW(hKey, L"gnwinfo", NULL, &type, (LPBYTE)path, &size);
+			RegCloseKey(hKey);
+
+			if (result == ERROR_SUCCESS && type == REG_SZ)
+			{
+				NWL_Debug("AUTOSTART", "Get: Found in %ls, path=%ls", reg_path, path);
+				found = nk_true;
+			}
+		}
+	}
+
+	NWL_Debug("AUTOSTART", "Get: Returning %d", found);
+	return found;
+}
+
+void gnwinfo_set_autostart_internal(nk_bool enable, nk_bool show_message)
+{
+	HKEY hKey;
+	LONG result;
+	WCHAR path[MAX_PATH];
+	WCHAR quoted_path[MAX_PATH + 4];
+	
+	NWL_Debug("AUTOSTART", "Set: enable=%d", enable);
+	
+	if (GetModuleFileNameW(NULL, path, MAX_PATH) == 0)
+	{
+		NWL_Debug("AUTOSTART", "Set: Failed to get module path");
+		return;
+	}
+	
+	if (swprintf_s(quoted_path, MAX_PATH + 4, L"\"%s\"", path) == -1)
+	{
+		NWL_Debug("AUTOSTART", "Set: Failed to format path");
+		return;
+	}
+	
+	const WCHAR* registry_paths[] = {
+		L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run"
+	};
+	int num_paths = 1;
+	
+	for (int i = 0; i < num_paths; i++)
+	{
+		const WCHAR* reg_path = registry_paths[i];
+		
+		result = RegCreateKeyExW(HKEY_CURRENT_USER, reg_path, 
+			0, NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &hKey, NULL);
+		
+		if (result == ERROR_SUCCESS)
+		{
+			if (enable)
+			{
+				result = RegSetValueExW(hKey, L"gnwinfo", 0, REG_SZ, 
+					(LPBYTE)quoted_path, (DWORD)((wcslen(quoted_path) + 1) * sizeof(WCHAR)));
+				
+				if (result == ERROR_SUCCESS)
+				{
+					NWL_Debug("AUTOSTART", "Set: Success writing to %ls", reg_path);
+					RegFlushKey(hKey);
+				}
+			}
+			else
+			{
+				result = RegDeleteValueW(hKey, L"gnwinfo");
+				if (result == ERROR_SUCCESS || result == ERROR_FILE_NOT_FOUND)
+				{
+					RegFlushKey(hKey);
+				}
+			}
+			
+			RegCloseKey(hKey);
+		}
+	}
+	
+	if (show_message)
+	{
+		if (enable)
+		{
+			MessageBoxW(NULL, L"自启动设置成功！", L"自启动设置", MB_OK | MB_ICONINFORMATION);
+		}
+		else
+		{
+			MessageBoxW(NULL, L"已删除自启动项", L"自启动设置", MB_OK | MB_ICONINFORMATION);
+		}
+	}
+}
+
+void gnwinfo_set_autostart(nk_bool enable)
+{
+	gnwinfo_set_autostart_internal(enable, nk_true);
+}
+static void create_tray_icon(HWND wnd)
+{
+	memset(&g_nid, 0, sizeof(NOTIFYICONDATAW));
+	g_nid.cbSize = sizeof(NOTIFYICONDATAW);
+	g_nid.hWnd = wnd;
+	g_nid.uID = ID_TRAY_ICON;
+	g_nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+	g_nid.uCallbackMessage = WM_TRAYMESSAGE;
+	g_nid.hIcon = LoadIconW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(IDI_ICON1));
+	wcscpy_s(g_nid.szTip, ARRAYSIZE(g_nid.szTip), L"NWinfo");
+	Shell_NotifyIconW(NIM_ADD, &g_nid);
+	g_tray_created = 1;
+}
+
+static void remove_tray_icon(void)
+{
+	if (g_tray_created)
+	{
+		Shell_NotifyIconW(NIM_DELETE, &g_nid);
+		g_tray_created = 0;
+	}
+}
+
+static void show_tray_menu(HWND wnd, POINT pt)
+{
+	HMENU hMenu = CreatePopupMenu();
+	AppendMenuW(hMenu, MF_STRING, ID_TRAY_SHOW, L"显示");
+	AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
+	AppendMenuW(hMenu, MF_STRING, ID_TRAY_EXIT, L"退出");
+
+	SetForegroundWindow(wnd);
+	TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, wnd, NULL);
+	PostMessageW(wnd, WM_NULL, 0, 0);
+	DestroyMenu(hMenu);
+}
+
 
 #define REGION_MASK_LEFT    (1 << 0)
 #define REGION_MASK_RIGHT   (1 << 1)
@@ -34,10 +184,10 @@ static UINT m_dpi = USER_DEFAULT_SCREEN_DPI;
 static void
 set_dpi_scaling(HWND wnd)
 {
-	WCHAR font_name[NWL_STR_SIZE];
-	GetPrivateProfileStringW(L"Window", L"Font", L"-", font_name, NWL_STR_SIZE, g_ini_path);
+	WCHAR font_name[64];
+	GetPrivateProfileStringW(L"Window", L"Font", L"-", font_name, 64, g_ini_path);
 	if (wcscmp(font_name, L"-") == 0)
-		wcscpy_s(font_name, NWL_STR_SIZE, NWL_Utf8ToUcs2(N_(N__FONT_)));
+		wcscpy_s(font_name, 64, NWL_Utf8ToUcs2(N_(N__FONT_)));
 	if (g_bginfo)
 		g_dpi_scaling = 0;
 	else
@@ -62,7 +212,6 @@ set_dpi_scaling(HWND wnd)
 	}
 	g_font = nk_gdip_load_font(font_name, g_font_size);
 	nk_gdip_set_font(g_font);
-	strncpy_s(g_font_name, NWL_STR_SIZE, NWL_Ucs2ToUtf8(font_name), _TRUNCATE);
 }
 
 static LRESULT CALLBACK
@@ -70,9 +219,74 @@ window_proc(HWND wnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
 	switch (msg)
 	{
+	case WM_CREATE:
+		create_tray_icon(wnd);
+		break;
 	case WM_DESTROY:
+		remove_tray_icon();
 		PostQuitMessage(0);
 		break;
+	case WM_CLOSE:
+		ShowWindow(wnd, SW_HIDE);
+		return 0;
+	case WM_COMMAND:
+	{
+		switch (LOWORD(wparam))
+		{
+		case ID_TRAY_SHOW:
+		{
+			struct nk_window* win;
+			const char* title = "NWinfo GUI";
+			for (win = g_ctx.nk->begin; win != NULL; win = win->next)
+			{
+				if (strcmp(win->name_string, title) == 0)
+				{
+					win->flags &= ~NK_WINDOW_HIDDEN;
+					break;
+				}
+			}
+			memset(&g_ctx.nk->input, 0, sizeof(g_ctx.nk->input));
+			ShowWindow(wnd, SW_RESTORE);
+			SetForegroundWindow(wnd);
+		}
+		break;
+		case ID_TRAY_EXIT:
+			PostMessageW(wnd, WM_DESTROY, 0, 0);
+			break;
+		}
+	}
+	break;
+	case WM_TRAYMESSAGE:
+	{
+		switch (lparam)
+		{
+		case WM_RBUTTONUP:
+		{
+			POINT pt;
+			GetCursorPos(&pt);
+			show_tray_menu(wnd, pt);
+		}
+		break;
+		case WM_LBUTTONDBLCLK:
+		{
+			struct nk_window* win;
+			const char* title = "NWinfo GUI";
+			for (win = g_ctx.nk->begin; win != NULL; win = win->next)
+			{
+				if (strcmp(win->name_string, title) == 0)
+				{
+					win->flags &= ~NK_WINDOW_HIDDEN;
+					break;
+				}
+			}
+			memset(&g_ctx.nk->input, 0, sizeof(g_ctx.nk->input));
+			ShowWindow(wnd, SW_RESTORE);
+			SetForegroundWindow(wnd);
+		}
+		break;
+		}
+	}
+	break;
 	case WM_TIMER:
 		gnwinfo_ctx_update(wparam);
 		break;
@@ -205,29 +419,19 @@ parse_cmdline(LPWSTR cmdline)
 	{
 		if (_wcsicmp(argv[i], L"/debug") == 0)
 		{
-			if (AttachConsole(ATTACH_PARENT_PROCESS))
+			if (AttachConsole(ATTACH_PARENT_PROCESS) == 0)
 			{
-				FILE* fp = NULL;
-				freopen_s(&fp, "CONOUT$", "w", stdout);
-				freopen_s(&fp, "CONOUT$", "w", stderr);
-				setvbuf(stdout, NULL, _IONBF, 0);
-				setvbuf(stderr, NULL, _IONBF, 0);
-				g_debug = 1;
+				AllocConsole();
 			}
+			FILE* fp = NULL;
+			freopen_s(&fp, "CONOUT$", "w", stdout);
+			freopen_s(&fp, "CONOUT$", "w", stderr);
+			setvbuf(stdout, NULL, _IONBF, 0);
+			setvbuf(stderr, NULL, _IONBF, 0);
+			g_debug = 1;
 		}
 	}
 	LocalFree(argv);
-}
-
-static void
-invalid_param_handler(const wchar_t* expr, const wchar_t* func, const wchar_t* file, unsigned int line, uintptr_t reserved)
-{
-	wchar_t msg[512];
-	_snwprintf_s(msg, _countof(msg), _TRUNCATE,
-		L"Function : %s\nFile     : %s\nLine     : %u\nDetail   : %s",
-		func, file, line, expr);
-	MessageBoxW(NULL, msg, L"FATAL ERROR", MB_OK | MB_ICONERROR | MB_TASKMODAL);
-	abort();
 }
 
 int APIENTRY
@@ -246,22 +450,55 @@ wWinMain(_In_ HINSTANCE hInstance,
 	int running = 1;
 	int needs_refresh = 1;
 	DWORD layered_flag = LWA_ALPHA;
-
-	_set_invalid_parameter_handler(invalid_param_handler);
+	HANDLE hMutex;
 
 	parse_cmdline(lpCmdLine);
+
+	hMutex = CreateMutexW(NULL, TRUE, L"NWinfo{e25f6e37-d51b-4950-8949-510dfc86d913}");
+	if (GetLastError() == ERROR_ALREADY_EXISTS || !hMutex)
+	{
+		MessageBoxW(NULL, L"ALREADY RUNNING", L"ERROR", MB_ICONERROR | MB_OK);
+		if (hMutex)
+			CloseHandle(hMutex);
+		return 1;
+	}
 
 	GetModuleFileNameW(NULL, g_ini_path, MAX_PATH);
 	PathCchRemoveFileSpec(g_ini_path, MAX_PATH);
 	PathCchAppend(g_ini_path, MAX_PATH, L"gnwinfo.ini");
 	x_pos = strtol(gnwinfo_get_ini_value(L"Window", L"X", L"100"), NULL, 10);
-	y_pos = strtol(gnwinfo_get_ini_value(L"Window", L"Y", L"100"), NULL, 10);
-	g_init_width = strtoul(gnwinfo_get_ini_value(L"Window", L"Width", L"600"), NULL, 10);
-	g_init_height = strtoul(gnwinfo_get_ini_value(L"Window", L"Height", L"800"), NULL, 10);
+	y_pos = strtol(gnwinfo_get_ini_value(L"Window", L"Y", L"10"), NULL, 10);
+	g_init_width =  strtoul(gnwinfo_get_ini_value(L"Window", L"Width", L"1000"), NULL, 10);
+	g_init_height = strtoul(gnwinfo_get_ini_value(L"Window", L"Height", L"700"), NULL, 10);
 	g_init_alpha = strtoul(gnwinfo_get_ini_value(L"Window", L"Alpha", L"255"), NULL, 10);
-	g_font_size = strtol(gnwinfo_get_ini_value(L"Window", L"FontSize", L"12"), NULL, 10);
-	g_font_size_cached = g_font_size;
-	g_lang_id = (LANGID)strtoul(gnwinfo_get_ini_value(L"Window", L"Language", L"0"), NULL, 10);
+	g_font_size = strtol(gnwinfo_get_ini_value(L"Window", L"FontSize", L"16"), NULL, 10);
+	str = gnwinfo_get_ini_value(L"Window", L"AutoStart", L"-1");
+	if (strcmp(str, "-1") == 0)
+	{
+		g_autostart = nk_false;
+		__try
+		{
+			gnwinfo_set_autostart_internal(nk_true, nk_false);
+		}
+		__except(EXCEPTION_EXECUTE_HANDLER)
+		{
+			NWL_Debug("AUTOSTART", "Set: Exception in initialization");
+		}
+		gnwinfo_set_ini_value(L"Window", L"AutoStart", L"%d", 1);
+	}
+	else
+	{
+		int autostart_val = strtol(str, NULL, 10);
+		g_autostart = (autostart_val == 0) ? nk_true : nk_false;
+		__try
+		{
+			gnwinfo_set_autostart_internal(autostart_val != 0, nk_false);
+		}
+		__except(EXCEPTION_EXECUTE_HANDLER)
+		{
+			NWL_Debug("AUTOSTART", "Set: Exception in initialization");
+		}
+	}
 	str = gnwinfo_get_ini_value(L"Window", L"BGInfo", L"0");
 	if (str[0] != '0')
 	{
@@ -366,5 +603,7 @@ wWinMain(_In_ HINSTANCE hInstance,
 	nk_gdip_shutdown();
 	UnregisterClassW(wc.lpszClassName, wc.hInstance);
 	gnwinfo_ctx_exit();
+	if (hMutex)
+		CloseHandle(hMutex);
 	return 0;
 }

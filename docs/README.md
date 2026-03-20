@@ -73,11 +73,6 @@ Exports active physical network interfaces with IPv4 addresses to `report.html` 
   Print debug info to stdout.  
 - --hide-sensitive  
   Hide sensitive data (MAC & S/N).  
-- --driver=`NAME`  
-  Specify the driver name.  
-  Available drivers are `CPUZ162`, `NwHwIo` and `PawnIO`.  
-  Use `NONE` to disable driver usage.  
-  By default, the program will search for and load drivers in the above order, see [Supported Drivers](#supported-drivers) for details.  
 
 ### Hardware Details
 
@@ -237,7 +232,7 @@ The program searches for and loads drivers in the following order: **CPUZ162 -> 
 |--------|----------|---------|------------|-----|------|-----|-----|
 | [PawnIO](https://github.com/namazso/PawnIO)           | PawnIO.sys     | ✅ | ✅ | ✅ | ❌ | ⚠️ | ❌ |
 | [CPUZ162](https://www.cpuid.com/softwares/cpu-z.html) | cpuz162x64.sys | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| [NwHwIo](https://www.evga.com/precisionx1/)           | NwHwIox64.sys  | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| [NwHwIo](https://www.evga.com/precisionx1/)           | NwHwIox64.sys  | ❌ | ✅ | ✅ | ❌ | ✅ | ✅ |
 
 **Note:** The program can still run normally even without drivers, but some hardware information may not be accessible.
 

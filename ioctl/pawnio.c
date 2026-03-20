@@ -32,6 +32,10 @@ WR0_InstallPawnIO(void)
 #ifdef _WIN64
 	if (NWLC->NwOsInfo.dwMajorVersion < 10)
 		return FALSE;
+	if (NWLC->NwOsInfo.dwMajorVersion == 10
+		&& NWLC->NwOsInfo.dwMinorVersion == 0
+		&& NWLC->NwOsInfo.dwBuildNumber < 19041U) // Windows 10 2004
+		return FALSE;
 
 	WCHAR path[MAX_PATH];
 	WCHAR cmdline[] = PAWNIO_SETUP_CMD;
@@ -71,7 +75,7 @@ int WR0_ExecPawn(struct wr0_drv_t* drv, struct pio_mod_t* mod, LPCSTR fn,
 	if (inBuf == NULL)
 		return -1;
 
-	strncpy_s(inBuf->Fn, PIO_FN_NAME_LEN, fn, _TRUNCATE);
+	strcpy_s(inBuf->Fn, PIO_FN_NAME_LEN, fn);
 
 	if (in)
 		memcpy(inBuf->Params, in, in_size * sizeof(ULONG64));

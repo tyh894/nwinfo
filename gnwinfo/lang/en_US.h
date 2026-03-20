@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: Unlicense
+// SPDX-License-Identifier: Unlicense
 // This file should be saved in UTF-8 **with** BOM encoding
 
 #include "../gettext.h"
@@ -6,8 +6,8 @@
 static const char*
 lang_en_us[N__MAX_] =
 {
-	[N__FONT_] = u8"Consolas", // The font name used in the GUI, should not be translated
-	[N__LANG_NAME_] = u8"English", // The language name used in the GUI
+	[N__FONT_] = u8"Microsoft YaHei",
+	[N__LANG_NAME_] = u8"English (United States)", // The language name used in the GUI
 	[N__LOADING] = u8"Loading",
 	[N__PLS_WAIT] = u8"Please wait ...",
 	[N__OS] = u8"Operating System",
@@ -113,11 +113,9 @@ lang_en_us[N__MAX_] =
 	[N__SHOW_SENSITIVE_DATA] = u8"Show sensitive data",
 	[N__DISABLE_DPI_SCALING] = u8"Disable DPI scaling",
 	[N__DISABLE_ANTIALIASING] = u8"Disable anti-aliasing",
-	[N__FONT_NAME] = u8"Font",
-	[N__FONT_SIZE] = u8"Font Size",
-	[N__WIDTH] = u8"Width",
-	[N__HEIGHT] = u8"Height",
-	[N__ALPHA] = u8"Alpha",
+	[N__WIDTH] = u8"#Width", // do not delete the '#' character
+	[N__HEIGHT] = u8"#Height", // do not delete the '#' character
+	[N__ALPHA] = u8"#Alpha", // do not delete the '#' character
 	[N__COLOR] = u8"Color",
 	[N__SAVE] = u8"Save",
 	[N__NO_DISKS_FOUND] = u8"No disks found",

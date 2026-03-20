@@ -6,9 +6,13 @@ struct nk_color g_color_warning = NK_COLOR_YELLOW;
 struct nk_color g_color_error = NK_COLOR_RED;
 struct nk_color g_color_good = NK_COLOR_GREEN;
 struct nk_color g_color_unknown = NK_COLOR_BLUE;
-struct nk_color g_color_text_l = NK_COLOR_WHITE;
-struct nk_color g_color_text_d = NK_COLOR_LIGHT;
-struct nk_color g_color_back = NK_COLOR_GRAY;
+struct nk_color g_color_text_l = NK_COLOR_GRAY;// NK_COLOR_WHITE;
+struct nk_color g_color_text_d = NK_COLOR_GRAY;// NK_COLOR_LIGHT;
+//struct nk_color g_color_back = NK_COLOR_GRAY;
+//struct nk_color g_color_back = NK_COLOR_WHITE;
+//struct nk_color g_color_back = { 0xF0, 0xF0, 0xF0, 0xFF };
+struct nk_color g_color_back = { 0xE0, 0xE0, 0xE0, 0xFF };
+
 
 static struct nk_color
 convert_color(struct nk_color color, float offset)
@@ -137,14 +141,16 @@ gnwinfo_set_style(struct nk_context* ctx)
 	ctx->style.property.edit.selected_text_normal = back_p3;
 	ctx->style.property.edit.selected_text_hover = back_p3;
 
-	ctx->style.scrollh.normal = nk_style_item_color(back_p2);
-	ctx->style.scrollh.hover = nk_style_item_color(back_p2);
-	ctx->style.scrollh.active = nk_style_item_color(back_p2);
-	ctx->style.scrollh.cursor_normal = nk_style_item_color(text_p30);
-	ctx->style.scrollh.cursor_hover = nk_style_item_color(text_p20);
-	ctx->style.scrollh.cursor_active = nk_style_item_color(text_p10);
-	ctx->style.scrollh.border_color = back_p2;
-	ctx->style.scrollh.cursor_border_color = back_p2;
+	struct nk_color scroll_color = g_color_back;
+	struct nk_color cursor_hover = { 0x70, 0x70, 0x70, 0xFF };  
+	ctx->style.scrollh.normal = nk_style_item_color(scroll_color);
+	ctx->style.scrollh.hover = nk_style_item_color(scroll_color);
+	ctx->style.scrollh.active = nk_style_item_color(scroll_color);
+	ctx->style.scrollh.cursor_normal = nk_style_item_color(cursor_hover);
+	ctx->style.scrollh.cursor_hover = nk_style_item_color(cursor_hover);
+	ctx->style.scrollh.cursor_active = nk_style_item_color(cursor_hover);
+	ctx->style.scrollh.border_color = scroll_color;
+	ctx->style.scrollh.cursor_border_color = scroll_color;
 	ctx->style.scrollv = ctx->style.scrollh;
 
 	ctx->style.edit.normal = nk_style_item_color(back_p3);
@@ -183,6 +189,4 @@ gnwinfo_set_style(struct nk_context* ctx)
 	ctx->style.contextual_button.text_hover = g_color_text_d;
 	ctx->style.contextual_button.text_active = g_color_text_d;
 	ctx->style.contextual_button.border_color = back_p8;
-
-	g_col_height = 1.5f * g_font_size + 2.0f * ctx->style.edit.padding.y;
 }

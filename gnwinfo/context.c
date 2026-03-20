@@ -43,6 +43,7 @@ gnwinfo_ctx_error_callback(LPCSTR lpszText)
 static void
 gnwinfo_ctx_update_1s(void)
 {
+	printf("DEBUG: gnwinfo_ctx_update_1s - start\n");
 	PNODE network = NULL;
 	NWLIB_MEM_INFO mem_status = { 0 };
 	NWLIB_NET_TRAFFIC net_traffic = { 0 };
@@ -62,12 +63,32 @@ gnwinfo_ctx_update_1s(void)
 	ReleaseSRWLockShared(&g_ctx.lock);
 	if (window_flag & GUI_WINDOW_SENSOR)
 	{
-		PNODE sensors = NW_Sensors(FALSE);
+		PNODE sensors = NULL;
+		__try
+		{
+			sensors = NW_Sensors(FALSE);
+		}
+		__except(EXCEPTION_EXECUTE_HANDLER)
+		{
+			printf("DEBUG: NW_Sensors - Exception caught!\n");
+			sensors = NULL;
+		}
 		AcquireSRWLockExclusive(&g_ctx.lock);
 		PNODE old_sensors = g_ctx.sensors;
 		g_ctx.sensors = sensors;
 		ReleaseSRWLockExclusive(&g_ctx.lock);
-		NWL_NodeFree(old_sensors, 1);
+		if (old_sensors)
+		{
+			__try
+			{
+				NWL_NodeFree(old_sensors, 1);
+			}
+			__except(EXCEPTION_EXECUTE_HANDLER)
+			{
+				printf("DEBUG: NWL_NodeFree(old_sensors) - Exception caught!\n");
+			}
+		}
+		printf("DEBUG: gnwinfo_ctx_update_1s - done (sensor mode)\n");
 		return;
 	}
 
@@ -77,17 +98,96 @@ gnwinfo_ctx_update_1s(void)
 	ReleaseSRWLockShared(&g_ctx.lock);
 
 	g_ctx.lib.NetFlags = NW_NET_PHYS | ((main_flag & MAIN_NET_INACTIVE) ? 0 : NW_NET_ACTIVE);
-	NWL_GetUptime(sys_uptime, NWL_STR_SIZE);
-	NWL_GetMemInfo(&mem_status);
-	network = NW_Network(FALSE);
-	NWL_GetNetTraffic(&net_traffic, !(main_flag & MAIN_NET_UNIT_B), NWLC->NwNetAdapters);
-	cpu_usage = NWL_GetCpuUsage();
-	cpu_freq = NWL_GetCpuFreq();
-	cpu_info = NWL_GetCpuMsr();
-	NWL_GetCurDisplay(g_ctx.wnd, &cur_display);
+	__try
+	{
+		NWL_GetUptime(sys_uptime, NWL_STR_SIZE);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		printf("DEBUG: NWL_GetUptime - Exception caught!\n");
+		strcpy_s(sys_uptime, sizeof(sys_uptime), "Unknown");
+	}
+	__try
+	{
+		NWL_GetMemInfo(&mem_status);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		printf("DEBUG: NWL_GetMemInfo - Exception caught!\n");
+	}
+	__try
+	{
+		network = NW_Network(FALSE);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		printf("DEBUG: NW_Network - Exception caught!\n");
+		network = NULL;
+	}
+	__try
+	{
+		NWL_GetNetTraffic(&net_traffic, !(main_flag & MAIN_NET_UNIT_B), NWLC->NwNetAdapters);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		printf("DEBUG: NWL_GetNetTraffic - Exception caught!\n");
+	}
+	__try
+	{
+		cpu_usage = NWL_GetCpuUsage();
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		printf("DEBUG: NWL_GetCpuUsage - Exception caught!\n");
+		cpu_usage = 0.0;
+	}
+	__try
+	{
+		cpu_freq = NWL_GetCpuFreq();
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		printf("DEBUG: NWL_GetCpuFreq - Exception caught!\n");
+		cpu_freq = 0;
+	}
+	__try
+	{
+		cpu_info = NWL_GetCpuMsr();
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		printf("DEBUG: NWL_GetCpuMsr - Exception caught!\n");
+		cpu_info = NULL;
+	}
+	__try
+	{
+		NWL_GetCurDisplay(g_ctx.wnd, &cur_display);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		printf("DEBUG: NWL_GetCurDisplay - Exception caught!\n");
+	}
 	if (main_flag & MAIN_INFO_AUDIO)
-		audio = NWL_GetAudio(&audio_count);
-	NWL_GetMemSensors(g_ctx.lib.NwSmbus, &mem_sensors);
+	{
+		__try
+		{
+			audio = NWL_GetAudio(&audio_count);
+		}
+		__except(EXCEPTION_EXECUTE_HANDLER)
+		{
+			printf("DEBUG: NWL_GetAudio - Exception caught!\n");
+			audio = NULL;
+			audio_count = 0;
+		}
+	}
+	__try
+	{
+		NWL_GetMemSensors(g_ctx.lib.NwSmbus, &mem_sensors);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		printf("DEBUG: NWL_GetMemSensors - Exception caught!\n");
+	}
 
 	AcquireSRWLockExclusive(&g_ctx.lock);
 	PNODE old_network = g_ctx.network;
@@ -100,34 +200,95 @@ gnwinfo_ctx_update_1s(void)
 	NWLIB_CPU_INFO* old_cpu = g_ctx.cpu_info;
 	g_ctx.cpu_info = cpu_info;
 	g_ctx.cur_display = cur_display;
-	NWL_GetGpuInfo(g_ctx.lib.NwGpu);
+	__try
+	{
+		if (g_ctx.lib.NwGpu)
+			NWL_GetGpuInfo(g_ctx.lib.NwGpu);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		printf("DEBUG: NWL_GetGpuInfo - Exception caught!\n");
+	}
 	NWLIB_AUDIO_DEV* old_audio = g_ctx.audio;
 	g_ctx.audio = audio;
 	g_ctx.audio_count = audio_count;
 	g_ctx.mem_sensors = mem_sensors;
 	ReleaseSRWLockExclusive(&g_ctx.lock);
 
-	NWL_NodeFree(old_network, 1);
-	free(old_audio);
-	free(old_cpu);
+	if (old_network)
+	{
+		__try
+		{
+			NWL_NodeFree(old_network, 1);
+		}
+		__except(EXCEPTION_EXECUTE_HANDLER)
+		{
+			printf("DEBUG: NWL_NodeFree(old_network) - Exception caught!\n");
+		}
+	}
+	if (old_audio)
+	{
+		__try
+		{
+			free(old_audio);
+		}
+		__except(EXCEPTION_EXECUTE_HANDLER)
+		{
+			printf("DEBUG: free(old_audio) - Exception caught!\n");
+		}
+	}
+	if (old_cpu)
+	{
+		__try
+		{
+			free(old_cpu);
+		}
+		__except(EXCEPTION_EXECUTE_HANDLER)
+		{
+			printf("DEBUG: free(old_cpu) - Exception caught!\n");
+		}
+	}
+	printf("DEBUG: gnwinfo_ctx_update_1s - done\n");
 }
 
 static void
 gnwinfo_ctx_update_battery(void)
 {
-	PNODE battery = NW_Battery(FALSE);
+	printf("DEBUG: gnwinfo_ctx_update_battery - start\n");
+	PNODE battery = NULL;
+	__try
+	{
+		battery = NW_Battery(FALSE);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		printf("DEBUG: NW_Battery - Exception caught!\n");
+		battery = NULL;
+	}
 
 	AcquireSRWLockExclusive(&g_ctx.lock);
 	PNODE old_battery = g_ctx.battery;
 	g_ctx.battery = battery;
 	ReleaseSRWLockExclusive(&g_ctx.lock);
 
-	NWL_NodeFree(old_battery, 1);
+	if (old_battery)
+	{
+		__try
+		{
+			NWL_NodeFree(old_battery, 1);
+		}
+		__except(EXCEPTION_EXECUTE_HANDLER)
+		{
+			printf("DEBUG: NWL_NodeFree(old_battery) - Exception caught!\n");
+		}
+	}
+	printf("DEBUG: gnwinfo_ctx_update_battery - done\n");
 }
 
 static void
 gnwinfo_ctx_update_disk(void)
 {
+	printf("DEBUG: gnwinfo_ctx_update_disk - start\n");
 	DWORD main_flag = 0;
 
 	AcquireSRWLockShared(&g_ctx.lock);
@@ -137,62 +298,159 @@ gnwinfo_ctx_update_disk(void)
 	g_ctx.lib.NwSmartInit = FALSE;
 	g_ctx.lib.DiskFlags = (main_flag & MAIN_DISK_SMART) ? 0 : NW_DISK_NO_SMART;
 
-	PNODE disk = NW_Disk(FALSE);
+	PNODE disk = NULL;
+	__try
+	{
+		disk = NW_Disk(FALSE);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		printf("DEBUG: NW_Disk - Exception caught!\n");
+		disk = NULL;
+	}
 
 	AcquireSRWLockExclusive(&g_ctx.lock);
 	PNODE old_disk = g_ctx.disk;
 	g_ctx.disk = disk;
 	ReleaseSRWLockExclusive(&g_ctx.lock);
 
-	NWL_NodeFree(old_disk, 1);
+	if (old_disk)
+	{
+		__try
+		{
+			NWL_NodeFree(old_disk, 1);
+		}
+		__except(EXCEPTION_EXECUTE_HANDLER)
+		{
+			printf("DEBUG: NWL_NodeFree(old_disk) - Exception caught!\n");
+		}
+	}
+	printf("DEBUG: gnwinfo_ctx_update_disk - done\n");
 }
 
 static void
 gnwinfo_ctx_update_smb(void)
 {
-	PNODE smb = NW_NetShare(FALSE);
+	printf("DEBUG: gnwinfo_ctx_update_smb - start\n");
+	PNODE smb = NULL;
+	__try
+	{
+		smb = NW_NetShare(FALSE);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		printf("DEBUG: NW_NetShare - Exception caught!\n");
+		smb = NULL;
+	}
 
 	AcquireSRWLockExclusive(&g_ctx.lock);
 	PNODE old_smb = g_ctx.smb;
 	g_ctx.smb = smb;
 	ReleaseSRWLockExclusive(&g_ctx.lock);
 
-	NWL_NodeFree(old_smb, 1);
+	if (old_smb)
+	{
+		__try
+		{
+			NWL_NodeFree(old_smb, 1);
+		}
+		__except(EXCEPTION_EXECUTE_HANDLER)
+		{
+			printf("DEBUG: NWL_NodeFree(old_smb) - Exception caught!\n");
+		}
+	}
+	printf("DEBUG: gnwinfo_ctx_update_smb - done\n");
 }
 
 static void
 gnwinfo_ctx_update_display(void)
 {
-	PNODE edid = NW_Edid(FALSE);
+	printf("DEBUG: gnwinfo_ctx_update_display - start\n");
+	PNODE edid = NULL;
+	__try
+	{
+		edid = NW_Edid(FALSE);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		printf("DEBUG: NW_Edid - Exception caught!\n");
+		edid = NULL;
+	}
 
 	AcquireSRWLockExclusive(&g_ctx.lock);
 	PNWLIB_GPU_INFO gpu = g_ctx.lib.NwGpu;
 	g_ctx.lib.NwGpu = NULL;
-	NWL_FreeGpu(gpu);
+	__try
+	{
+		if (gpu)
+			NWL_FreeGpu(gpu);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		printf("DEBUG: NWL_FreeGpu - Exception caught!\n");
+	}
 	PNODE old_edid = g_ctx.edid;
 	g_ctx.edid = edid;
 	ReleaseSRWLockExclusive(&g_ctx.lock);
 
-	g_ctx.lib.NwGpu = NWL_InitGpu();
-	NWL_NodeFree(old_edid, 1);
+	__try
+	{
+		g_ctx.lib.NwGpu = NWL_InitGpu();
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		printf("DEBUG: NWL_InitGpu - Exception caught!\n");
+		g_ctx.lib.NwGpu = NULL;
+	}
+	__try
+	{
+		if (old_edid)
+			NWL_NodeFree(old_edid, 1);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		printf("DEBUG: NWL_NodeFree(old_edid) - Exception caught!\n");
+	}
+	printf("DEBUG: gnwinfo_ctx_update_display - done\n");
 }
 
 static void
 gnwinfo_ctx_update_spd(void)
 {
+	printf("DEBUG: gnwinfo_ctx_update_spd - start\n");
 	DWORD main_flag = 0;
 	AcquireSRWLockShared(&g_ctx.lock);
 	main_flag = g_ctx.main_flag;
 	ReleaseSRWLockShared(&g_ctx.lock);
 
-	PNODE spd = (main_flag & MAIN_SMBUS_SPD) ? NULL : NW_Spd(FALSE);
+	PNODE spd = NULL;
+	__try
+	{
+		spd = (main_flag & MAIN_SMBUS_SPD) ? NULL : NW_Spd(FALSE);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		printf("DEBUG: NW_Spd - Exception caught!\n");
+		spd = NULL;
+	}
 
 	AcquireSRWLockExclusive(&g_ctx.lock);
 	PNODE old_spd = g_ctx.spd;
 	g_ctx.spd = spd;
 	ReleaseSRWLockExclusive(&g_ctx.lock);
 
-	NWL_NodeFree(old_spd, 1);
+	if (old_spd)
+	{
+		__try
+		{
+			NWL_NodeFree(old_spd, 1);
+		}
+		__except(EXCEPTION_EXECUTE_HANDLER)
+		{
+			printf("DEBUG: NWL_NodeFree(old_spd) - Exception caught!\n");
+		}
+	}
+	printf("DEBUG: gnwinfo_ctx_update_spd - done\n");
 }
 
 static const struct
@@ -264,13 +522,7 @@ gnwinfo_ctx_update(WPARAM wparam)
 void
 gnwinfo_ctx_init(HINSTANCE inst, HWND wnd, struct nk_context* ctx, float width, float height)
 {
-	g_ctx.mutex = CreateMutexW(NULL, TRUE, L"NWinfo{e25f6e37-d51b-4950-8949-510dfc86d913}");
-	if (GetLastError() == ERROR_ALREADY_EXISTS || !g_ctx.mutex)
-	{
-		MessageBoxW(NULL, L"ALREADY RUNNING", L"ERROR", MB_ICONERROR | MB_OK);
-		exit(1);
-	}
-
+	g_ctx.mutex = NULL;
 	InitializeSRWLock(&g_ctx.lock);
 	g_ctx.update_mask = 0;
 	g_ctx.exit_pending = 0;
@@ -341,30 +593,117 @@ gnwinfo_ctx_init(HINSTANCE inst, HWND wnd, struct nk_context* ctx, float width, 
 	g_ctx.cpuid = NW_Cpuid(TRUE);
 	g_ctx.system = NW_System(TRUE);
 	g_ctx.smbios = NW_Smbios(TRUE);
-	g_ctx.board = NW_Mainboard(TRUE);
-	g_ctx.uefi = NW_Uefi(TRUE);
-	g_ctx.pci = NW_Pci(TRUE);
+	__try
+	{
+		g_ctx.board = NW_Mainboard(TRUE);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		g_ctx.board = NULL;
+	}
+	__try
+	{
+		g_ctx.uefi = NW_Uefi(TRUE);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		g_ctx.uefi = NULL;
+	}
+	__try
+	{
+		g_ctx.pci = NW_Pci(TRUE);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		g_ctx.pci = NULL;
+	}
 
-	g_ctx.sys_boot = NWL_NodeAttrGet(g_ctx.system, "Boot Device");
-	g_ctx.sys_disk = NWL_NodeAttrGet(g_ctx.system, "System Device");
+	__try
+	{
+		g_ctx.sys_boot = NWL_NodeAttrGet(g_ctx.system, "Boot Device");
+		g_ctx.sys_disk = NWL_NodeAttrGet(g_ctx.system, "System Device");
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		g_ctx.sys_boot = "(null)";
+		g_ctx.sys_disk = "(null)";
+	}
+	__try
+	{
+		g_ctx.cpu_count = (int)g_ctx.lib.NwCpuid->num_cpu_types;
+		g_ctx.cpu_info = NWL_GetCpuMsr();
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		g_ctx.cpu_count = 0;
+		g_ctx.cpu_info = NULL;
+	}
+	__try
+	{
+		NWL_GetHostname(g_ctx.sys_hostname);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		strcpy_s(g_ctx.sys_hostname, sizeof(g_ctx.sys_hostname), "Unknown");
+	}
 
-	g_ctx.cpu_count = (int)g_ctx.lib.NwCpuid->num_cpu_types;
-	g_ctx.cpu_info = NWL_GetCpuMsr();
+	__try
+	{
+		gnwinfo_ctx_update(IDT_TIMER_DISPLAY);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+	}
+	__try
+	{
+		gnwinfo_ctx_update(IDT_TIMER_1S);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+	}
+	__try
+	{
+		gnwinfo_ctx_update(IDT_TIMER_1M);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+	}
+	__try
+	{
+		gnwinfo_ctx_update(IDT_TIMER_DISK);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+	}
+	__try
+	{
+		gnwinfo_ctx_update(IDT_TIMER_SMB);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+	}
+	__try
+	{
+		gnwinfo_ctx_update(IDT_TIMER_SPD);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+	}
+	__try
+	{
+		for (WORD i = 0; i < sizeof(g_ctx.image) / sizeof(g_ctx.image[0]); i++)
+			g_ctx.image[i] = load_png(i + IDR_PNG_MIN);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		printf("DEBUG: Exception when loading images!\n");
+	}
+	printf("DEBUG: Images loaded\n");
 
-	NWL_GetHostname(g_ctx.sys_hostname);
-
-	gnwinfo_ctx_update(IDT_TIMER_DISPLAY);
-	gnwinfo_ctx_update(IDT_TIMER_1S);
-	gnwinfo_ctx_update(IDT_TIMER_1M);
-	gnwinfo_ctx_update(IDT_TIMER_DISK);
-	gnwinfo_ctx_update(IDT_TIMER_SMB);
-	gnwinfo_ctx_update(IDT_TIMER_SPD);
-
-	for (WORD i = 0; i < sizeof(g_ctx.image) / sizeof(g_ctx.image[0]); i++)
-		g_ctx.image[i] = load_png(i + IDR_PNG_MIN);
-
+	printf("DEBUG: Setting timers\n");
 	SetTimer(g_ctx.wnd, IDT_TIMER_1S, 1000, (TIMERPROC)NULL);
 	SetTimer(g_ctx.wnd, IDT_TIMER_1M, 60 * 1000, (TIMERPROC)NULL);
+	printf("DEBUG: Timers set, init done\n");
 }
 
 noreturn void
@@ -402,8 +741,6 @@ gnwinfo_ctx_exit(void)
 	if (g_ctx.audio)
 		free(g_ctx.audio);
 
-	ReleaseMutex(g_ctx.mutex);
-	CloseHandle(g_ctx.mutex);
 	NWL_NodeFree(g_ctx.network, 1);
 	NWL_NodeFree(g_ctx.disk, 1);
 	NWL_NodeFree(g_ctx.smb, 1);
