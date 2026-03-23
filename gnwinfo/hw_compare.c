@@ -102,6 +102,68 @@ nk_bool gnwinfo_hw_compare_available(void)
 	return g_hw_json != NULL;
 }
 
+LPCSTR gnwinfo_hw_compare_get_nested_string(LPCSTR node_name, LPCSTR sub_name, LPCSTR attr_name)
+{
+	if (!g_hw_json)
+		return NULL;
+
+	cJSON* node = cJSON_GetObjectItem(g_hw_json, node_name);
+	if (!node)
+		return NULL;
+
+	cJSON* sub = sub_name ? cJSON_GetObjectItem(node, sub_name) : node;
+	if (!sub)
+		return NULL;
+
+	cJSON* attr = cJSON_GetObjectItem(sub, attr_name);
+	if (!attr)
+		return NULL;
+
+	if (attr->type & cJSON_String)
+		return attr->valuestring;
+	if (attr->type & cJSON_Number)
+	{
+		static char num_buf[32];
+		snprintf(num_buf, sizeof(num_buf), "%d", attr->valueint);
+		return num_buf;
+	}
+
+	return NULL;
+}
+
+LPCSTR gnwinfo_hw_compare_get_deep_nested_string(LPCSTR node_name, LPCSTR sub_name1, LPCSTR sub_name2, LPCSTR attr_name)
+{
+	if (!g_hw_json)
+		return NULL;
+
+	cJSON* node = cJSON_GetObjectItem(g_hw_json, node_name);
+	if (!node)
+		return NULL;
+
+	cJSON* sub1 = sub_name1 ? cJSON_GetObjectItem(node, sub_name1) : node;
+	if (!sub1)
+		return NULL;
+
+	cJSON* sub2 = sub_name2 ? cJSON_GetObjectItem(sub1, sub_name2) : sub1;
+	if (!sub2)
+		return NULL;
+
+	cJSON* attr = cJSON_GetObjectItem(sub2, attr_name);
+	if (!attr)
+		return NULL;
+
+	if (attr->type & cJSON_String)
+		return attr->valuestring;
+	if (attr->type & cJSON_Number)
+	{
+		static char num_buf[32];
+		snprintf(num_buf, sizeof(num_buf), "%d", attr->valueint);
+		return num_buf;
+	}
+
+	return NULL;
+}
+
 LPCSTR gnwinfo_hw_compare_get_string(LPCSTR node_name, LPCSTR attr_name)
 {
 	if (!g_hw_json)
@@ -139,7 +201,7 @@ nk_bool gnwinfo_hw_compare_get_bool(LPCSTR node_name, LPCSTR attr_name)
 	return nk_false;
 }
 
-LPCSTR gnwinfo_hw_compare_get_nested_string(LPCSTR node_name, LPCSTR child_name, int index, LPCSTR attr_name)
+LPCSTR gnwinfo_hw_compare_get_array_item(LPCSTR node_name, LPCSTR child_name, int index, LPCSTR attr_name)
 {
 	if (!g_hw_json)
 		return NULL;
@@ -212,9 +274,60 @@ LPCSTR gnwinfo_hw_compare_get_smbios_attr(int table_type, LPCSTR attr_name)
 		if (type && (type->type & cJSON_Number) && type->valueint == table_type)
 		{
 			cJSON* attr = cJSON_GetObjectItem(item, attr_name);
-			if (attr && (attr->type & cJSON_String))
+			if (!attr)
+				return NULL;
+
+			if (attr->type & cJSON_String)
 				return attr->valuestring;
+			if (attr->type & cJSON_Number)
+			{
+				static char num_buf[32];
+				snprintf(num_buf, sizeof(num_buf), "%d", attr->valueint);
+				return num_buf;
+			}
 			return NULL;
+		}
+	}
+	return NULL;
+}
+
+LPCSTR gnwinfo_hw_compare_get_smbios_attr_by_index(int table_type, int index, LPCSTR attr_name)
+{
+	if (!g_hw_json)
+		return NULL;
+
+	cJSON* smbios = cJSON_GetObjectItem(g_hw_json, "SMBIOS");
+	if (!smbios || !(smbios->type & cJSON_Array))
+		return NULL;
+
+	int size = cJSON_GetArraySize(smbios);
+	int match_count = 0;
+	for (int i = 0; i < size; i++)
+	{
+		cJSON* item = cJSON_GetArrayItem(smbios, i);
+		if (!item)
+			continue;
+
+		cJSON* type = cJSON_GetObjectItem(item, "Table Type");
+		if (type && (type->type & cJSON_Number) && type->valueint == table_type)
+		{
+			if (match_count == index)
+			{
+				cJSON* attr = cJSON_GetObjectItem(item, attr_name);
+				if (!attr)
+					return NULL;
+
+				if (attr->type & cJSON_String)
+					return attr->valuestring;
+				if (attr->type & cJSON_Number)
+				{
+					static char num_buf[32];
+					snprintf(num_buf, sizeof(num_buf), "%d", attr->valueint);
+					return num_buf;
+				}
+				return NULL;
+			}
+			match_count++;
 		}
 	}
 	return NULL;

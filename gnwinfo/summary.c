@@ -430,22 +430,8 @@ draw_computer(struct nk_context* ctx)
 static VOID
 draw_processor(struct nk_context* ctx)
 {
-	nk_layout_row(ctx, NK_DYNAMIC, 0, 5, (float[5]) { 0.2f, 0.2f, 0.4f - g_ctx.gui_ratio, 0.2f, g_ctx.gui_ratio });
+	nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) {  0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2, g_ctx.gui_ratio });
 	nk_image_label(ctx, GET_PNG(IDR_PNG_CPU), N_(N__CPU), NK_TEXT_LEFT, g_color_text_d);
-	
-	LPCSTR saved_cpu = gnwinfo_hw_compare_get_nested_string("Cpuid", "CPU", 0, "Brand");
-	LPCSTR current_cpu = NWL_NodeAttrGet(NWL_NodeEnumChild(g_ctx.cpuid, 0), "Brand");
-	if (gnwinfo_hw_compare_available() && saved_cpu)
-	{
-		if (gnwinfo_hw_compare_is_different(current_cpu, saved_cpu))
-			nk_lhc(ctx, saved_cpu, NK_TEXT_LEFT, g_color_warning);
-		else
-			nk_lhc(ctx, saved_cpu, NK_TEXT_LEFT, g_color_text_d);
-	}
-	else
-	{
-		nk_lhc(ctx, current_cpu, NK_TEXT_LEFT, g_color_text_d);
-	}
 	
 	nk_lhcf(ctx, NK_TEXT_LEFT, gnwinfo_get_color(g_ctx.cpu_usage, 70.0, 90.0),
 		"%.2f%% %lu MHz",
@@ -461,24 +447,56 @@ draw_processor(struct nk_context* ctx)
 		LPCSTR brand = NWL_NodeAttrGet(cpu, "Brand");
 		if (cpu == NULL)
 			break;
-		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.3f, 0.35f, 0.35f });
+
+		char cpu_node_name[32] = {0};
+		snprintf(cpu_node_name, sizeof(cpu_node_name), "CPU%d-G", i);
+
+		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2});
 		nk_lhsc(ctx, cpu->name, NK_TEXT_LEFT, g_color_text_d, nk_false, nk_true);
-		nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
+
+		LPCSTR saved_brand = gnwinfo_hw_compare_get_nested_string("CPUID", cpu_node_name, "Brand");
+		if (gnwinfo_hw_compare_available() && saved_brand)
+		{
+			if (gnwinfo_hw_compare_is_different(brand, saved_brand))
+				nk_lhc(ctx, saved_brand, NK_TEXT_LEFT, g_color_warning);
+			else
+				nk_lhc(ctx, saved_brand, NK_TEXT_LEFT, g_color_text_d);
+		}
+		else
+		{
+			nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
+		}
+
 		nk_lhc(ctx, brand, NK_TEXT_LEFT, g_color_text_l);
 
 		if (!(g_ctx.main_flag & MAIN_CPU_DETAIL))
 			continue;
 
-		nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.3f, 0.25f, 0.25f, 0.2f });
+		nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
 		nk_spacer(ctx);
-		nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
+
 		int len = snprintf(m_buf, MAX_PATH, "%s %s", NWL_NodeAttrGet(cpu, "Cores"), N_(N__CORES));
 		if (len >= 0 && len < MAX_PATH)
 			len += snprintf(m_buf + len, MAX_PATH - len, " %s %s",
 				NWL_NodeAttrGet(cpu, "Logical CPUs"),
 				N_(N__THREADS));
-		if (g_ctx.cpu_info[i].MsrPower > 0.0 && len >= 0 && len < MAX_PATH)
-			snprintf(m_buf + len, MAX_PATH - len, " %.2fW", g_ctx.cpu_info[i].MsrPower);
+
+		LPCSTR saved_cores = gnwinfo_hw_compare_get_nested_string("CPUID", cpu_node_name, "Cores");
+		LPCSTR saved_logical = gnwinfo_hw_compare_get_nested_string("CPUID", cpu_node_name, "Logical CPUs");
+		if (gnwinfo_hw_compare_available() && saved_cores && saved_logical)
+		{
+			char saved_spec[MAX_PATH] = {0};
+			snprintf(saved_spec, MAX_PATH, "%s %s %s %s",
+				saved_cores, N_(N__CORES), saved_logical, N_(N__THREADS));
+			if (gnwinfo_hw_compare_is_different(m_buf, saved_spec))
+				nk_lhc(ctx, saved_spec, NK_TEXT_LEFT, g_color_warning);
+			else
+				nk_lhc(ctx, saved_spec, NK_TEXT_LEFT, g_color_text_d);
+		}
+		else
+		{
+			nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
+		}
 
 		nk_lhc(ctx, m_buf, NK_TEXT_LEFT, g_color_text_l);
 		if (g_ctx.cpu_info[i].MsrTemp > 0)
@@ -490,14 +508,15 @@ draw_processor(struct nk_context* ctx)
 
 		if (!(g_ctx.main_flag & MAIN_CPU_CACHE))
 			continue;
-		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.3f, 0.35f, 0.35f });
+		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
 		nk_spacer(ctx);
-		nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
+
 		PNODE cache = NWL_NodeGetChild(cpu, "Cache");
 		LPCSTR l1 = NWL_NodeAttrGet(cache, "L1 Cache Size");
 		LPCSTR l2 = NWL_NodeAttrGet(cache, "L2 Cache Size");
 		LPCSTR l3 = NWL_NodeAttrGet(cache, "L3 Cache Size");
 		LPCSTR l4 = NWL_NodeAttrGet(cache, "L4 Cache Size");
+
 		len = snprintf(m_buf, MAX_PATH, "L1 %s", l1);
 		if (l2[0] != '-' && len >= 0 && len < MAX_PATH)
 			len += snprintf(m_buf + len, MAX_PATH - len, " L2 %s", l2);
@@ -505,6 +524,29 @@ draw_processor(struct nk_context* ctx)
 			len += snprintf(m_buf + len, MAX_PATH - len, " L3 %s", l3);
 		if (l4[0] != '-' && len >= 0 && len < MAX_PATH)
 			snprintf(m_buf + len, MAX_PATH - len, " L4 %s", l4);
+
+		LPCSTR saved_l1 = gnwinfo_hw_compare_get_deep_nested_string("CPUID", cpu_node_name, "Cache", "L1 Cache Size");
+		LPCSTR saved_l2 = gnwinfo_hw_compare_get_deep_nested_string("CPUID", cpu_node_name, "Cache", "L2 Cache Size");
+		LPCSTR saved_l3 = gnwinfo_hw_compare_get_deep_nested_string("CPUID", cpu_node_name, "Cache", "L3 Cache Size");
+		if (gnwinfo_hw_compare_available() && saved_l1)
+		{
+			char saved_cache[MAX_PATH] = {0};
+			snprintf(saved_cache, MAX_PATH, "L1 %s", saved_l1);
+			if (saved_l2 && strcmp(saved_l2, "-") != 0)
+				snprintf(saved_cache + strlen(saved_cache), MAX_PATH - strlen(saved_cache), " L2 %s", saved_l2);
+			if (saved_l3 && strcmp(saved_l3, "-") != 0)
+				snprintf(saved_cache + strlen(saved_cache), MAX_PATH - strlen(saved_cache), " L3 %s", saved_l3);
+
+			if (gnwinfo_hw_compare_is_different(m_buf, saved_cache))
+				nk_lhc(ctx, saved_cache, NK_TEXT_LEFT, g_color_warning);
+			else
+				nk_lhc(ctx, saved_cache, NK_TEXT_LEFT, g_color_text_d);
+		}
+		else
+		{
+			nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
+		}
+
 		nk_lhc(ctx, m_buf, NK_TEXT_LEFT, g_color_text_l);
 	}
 }
@@ -512,16 +554,51 @@ draw_processor(struct nk_context* ctx)
 static VOID
 draw_mem_capacity(struct nk_context* ctx)
 {
-	nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.3f, 0.35f, 0.35f });
+	nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio / 2, 0.4f - g_ctx.gui_ratio / 2 });
 	nk_lhsc(ctx, N_(N__MAX_CAPACITY), NK_TEXT_LEFT, g_color_text_d, nk_false, nk_true);
-	nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
+
 	LPCSTR id = "16";
 	LPCSTR capacity = gnwinfo_get_smbios_attr(id, "Max Capacity", NULL, NULL);
+	LPCSTR saved_capacity = gnwinfo_hw_compare_get_smbios_attr(16, "Max Capacity");
+	LPCSTR saved_slots = gnwinfo_hw_compare_get_smbios_attr(16, "Number of Slots");
+
 	if (capacity[0] == '-')
 	{
 		id = "5";
 		capacity = gnwinfo_get_smbios_attr(id, "Max Memory Module Size (MB)", NULL, NULL);
+		saved_capacity = gnwinfo_hw_compare_get_smbios_attr(17, "Device Size");
+		saved_slots = NULL;
 	}
+
+	if (gnwinfo_hw_compare_available() && saved_capacity)
+	{
+		char saved_buf[MAX_PATH] = {0};
+		if (saved_slots)
+		{
+			snprintf(saved_buf, MAX_PATH, "%s %s %s%s",
+				saved_slots, N_(N__SLOTS), saved_capacity, id[0] == '5' ? " MB" : "");
+		}
+		else
+		{
+			snprintf(saved_buf, MAX_PATH, "%s%s", saved_capacity, id[0] == '5' ? " MB" : "");
+		}
+
+		snprintf(m_buf, MAX_PATH, "%s %s %s%s",
+			gnwinfo_get_smbios_attr(id, "Number of Slots", NULL, NULL),
+			N_(N__SLOTS),
+			capacity,
+			id[0] == '5' ? " MB" : "");
+
+		if (gnwinfo_hw_compare_is_different(m_buf, saved_buf))
+			nk_lhc(ctx, saved_buf, NK_TEXT_LEFT, g_color_warning);
+		else
+			nk_lhc(ctx, saved_buf, NK_TEXT_LEFT, g_color_text_d);
+	}
+	else
+	{
+		nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
+	}
+
 	snprintf(m_buf, MAX_PATH, "%s %s %s%s",
 		gnwinfo_get_smbios_attr(id, "Number of Slots", NULL, NULL),
 		N_(N__SLOTS),
@@ -533,8 +610,9 @@ draw_mem_capacity(struct nk_context* ctx)
 static VOID
 draw_mem_dmi(struct nk_context* ctx)
 {
-	nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.3f, 0.35f, 0.35f });
+	nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2});
 	INT count = NWL_NodeChildCount(g_ctx.smbios);
+	int device_index = 0;
 	for (INT i = 0; i < count; i++)
 	{
 		PNODE tab = NWL_NodeEnumChild(g_ctx.smbios, i);
@@ -545,7 +623,41 @@ draw_mem_dmi(struct nk_context* ctx)
 		if (ddr[0] == '-')
 			continue;
 		nk_lhsc(ctx, NWL_NodeAttrGet(tab, "Bank Locator"), NK_TEXT_LEFT, g_color_text_d, nk_true, nk_true);
-		nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
+
+		LPCSTR saved_ddr = gnwinfo_hw_compare_get_smbios_attr_by_index(17, device_index, "Device Type");
+		LPCSTR saved_speed = gnwinfo_hw_compare_get_smbios_attr_by_index(17, device_index, "Speed (MT/s)");
+		LPCSTR saved_size = gnwinfo_hw_compare_get_smbios_attr_by_index(17, device_index, "Device Size");
+		LPCSTR saved_manuf = gnwinfo_hw_compare_get_smbios_attr_by_index(17, device_index, "Manufacturer");
+		LPCSTR saved_serial = gnwinfo_hw_compare_get_smbios_attr_by_index(17, device_index, "Serial Number");
+
+		if (gnwinfo_hw_compare_available() && saved_ddr)
+		{
+			char saved_buf[MAX_PATH] = {0};
+			snprintf(saved_buf, MAX_PATH, "%s-%s %s %s %s",
+				saved_ddr,
+				saved_speed ? saved_speed : NWL_NodeAttrGet(tab, "Speed (MT/s)"),
+				saved_size,
+				saved_manuf,
+				saved_serial);
+
+			char current_buf[MAX_PATH] = {0};
+			snprintf(current_buf, MAX_PATH, "%s-%s %s %s %s",
+				ddr,
+				NWL_NodeAttrGet(tab, "Speed (MT/s)"),
+				NWL_NodeAttrGet(tab, "Device Size"),
+				NWL_NodeAttrGet(tab, "Manufacturer"),
+				NWL_NodeAttrGet(tab, "Serial Number"));
+
+			if (gnwinfo_hw_compare_is_different(current_buf, saved_buf))
+				nk_lhc(ctx, saved_buf, NK_TEXT_LEFT, g_color_warning);
+			else
+				nk_lhc(ctx, saved_buf, NK_TEXT_LEFT, g_color_text_d);
+		}
+		else
+		{
+			nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
+		}
+
 		nk_lhcf(ctx, NK_TEXT_LEFT, g_color_text_l,
 			"%s-%s %s %s %s",
 			ddr,
@@ -553,6 +665,8 @@ draw_mem_dmi(struct nk_context* ctx)
 			NWL_NodeAttrGet(tab, "Device Size"),
 			NWL_NodeAttrGet(tab, "Manufacturer"),
 			NWL_NodeAttrGet(tab, "Serial Number"));
+		
+		device_index++;
 	}
 }
 
@@ -568,7 +682,7 @@ draw_mem_spd(struct nk_context* ctx)
 	for (INT i = 0; i < count; i++)
 	{
 		PNODE tab = NWL_NodeEnumChild(g_ctx.spd, i);
-		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.3f, 0.35f, 0.35f });
+		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2});
 		nk_lhscf(ctx, NK_TEXT_LEFT, g_color_text_d, nk_true, nk_true, "BANK %s", NWL_NodeAttrGet(tab, "ID"));
 		nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
 		nk_lhcf(ctx, NK_TEXT_LEFT, g_color_text_l,
@@ -578,7 +692,7 @@ draw_mem_spd(struct nk_context* ctx)
 			NWL_NodeAttrGet(tab, "Capacity"),
 			NWL_NodeAttrGet(tab, "Manufacturer"),
 			NWL_NodeAttrGet(tab, "Serial Number"));
-		nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.3f, 0.25f, 0.25f, 0.2f });
+		nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2, g_ctx.gui_ratio });
 		nk_spacer(ctx);
 		nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
 		nk_lhcf(ctx, NK_TEXT_LEFT, g_color_text_l,
@@ -599,22 +713,8 @@ draw_mem_spd(struct nk_context* ctx)
 static VOID
 draw_memory(struct nk_context* ctx)
 {
-	nk_layout_row(ctx, NK_DYNAMIC, 0, 5, (float[5]) { 0.2f, 0.2f, 0.4f - g_ctx.gui_ratio, 0.2f, g_ctx.gui_ratio });
+	nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 , g_ctx.gui_ratio });
 	nk_image_label(ctx, GET_PNG(IDR_PNG_MEMORY), N_(N__MEMORY), NK_TEXT_LEFT, g_color_text_d);
-	
-	LPCSTR saved_mem = gnwinfo_hw_compare_get_string("System", "Total Memory");
-	if (gnwinfo_hw_compare_available() && saved_mem)
-	{
-		if (gnwinfo_hw_compare_is_different(g_ctx.mem_status.StrPhysTotal, saved_mem))
-			nk_lhc(ctx, saved_mem, NK_TEXT_LEFT, g_color_warning);
-		else
-			nk_lhc(ctx, saved_mem, NK_TEXT_LEFT, g_color_text_d);
-	}
-	else
-	{
-		nk_lhc(ctx, g_ctx.mem_status.StrPhysTotal, NK_TEXT_LEFT, g_color_text_d);
-	}
-	
 	nk_lhcf(ctx, NK_TEXT_LEFT,
 		gnwinfo_get_color((double)g_ctx.mem_status.PhysUsage, 70.0, 90.0),
 		"%lu%% %s / %s",
@@ -632,7 +732,6 @@ draw_memory(struct nk_context* ctx)
 			draw_mem_dmi(ctx);
 	}
 }
-
 static VOID
 draw_display(struct nk_context* ctx)
 {
@@ -748,7 +847,7 @@ draw_volume(struct nk_context* ctx, PNODE disk, BOOL cdrom)
 	PNODE vol = NWL_NodeGetChild(disk, "Volumes");
 	if (!vol)
 		return;
-	nk_layout_row(ctx, NK_DYNAMIC, 0, 6, (float[6]) { 0.1f, 0.1f, 0.2f, 0.25f, 0.15f, 0.2f });
+	nk_layout_row(ctx, NK_DYNAMIC, 0, 5, (float[5]) { 0.12f, 0.18f, 0.4f, 0.3f - g_ctx.gui_ratio, g_ctx.gui_ratio });
 	INT count = NWL_NodeChildCount(vol);
 	for (INT i = 0; i < count; i++)
 	{
@@ -765,7 +864,6 @@ draw_volume(struct nk_context* ctx, PNODE disk, BOOL cdrom)
 		nk_spacer(ctx);
 		nk_lhcf(ctx, NK_TEXT_LEFT, g_color_text_d, "[%s]",
 			drive ? drive : NWL_NodeAttrGet(tab, "Partition Flag"));
-		nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
 		nk_lhcf(ctx, NK_TEXT_LEFT,
 			g_color_text_l,
 			"%s %s %s",
@@ -833,9 +931,8 @@ draw_net_drive(struct nk_context* ctx)
 			continue;
 		LPCSTR local = NWL_NodeAttrGet(nd, "Local Name");
 		LPCSTR remote = NWL_NodeAttrGet(nd, "Remote Name");
-		nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.3f, 0.25f, 0.25f, 0.2f });
+		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.3f, 0.7f - g_ctx.gui_ratio, g_ctx.gui_ratio });
 		nk_lhsc(ctx, N_(N__NETWORK_DRIVES), NK_TEXT_LEFT, g_color_text_d, nk_false, nk_true);
-		nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
 		nk_lhcf(ctx, NK_TEXT_LEFT, g_color_text_l, "[%s] %s", local, remote);
 		if (quick_access_button(ctx, GET_PNG(IDR_PNG_DIR), NULL))
 			open_folder(NULL, remote);
@@ -880,10 +977,8 @@ draw_net_drive_compact(struct nk_context* ctx)
 static VOID
 draw_storage(struct nk_context* ctx)
 {
-	nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2, g_ctx.gui_ratio });
+	nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 1.0f - g_ctx.gui_ratio, g_ctx.gui_ratio });
 	nk_image_label(ctx, GET_PNG(IDR_PNG_DISK), N_(N__STORAGE), NK_TEXT_LEFT, g_color_text_d);
-	nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
-	nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
 	if (quick_access_button(ctx, GET_PNG(IDR_PNG_SMART), "S.M.A.R.T."))
 		g_ctx.window_flag |= GUI_WINDOW_SMART;
 
@@ -919,7 +1014,7 @@ draw_storage(struct nk_context* ctx)
 			prefix = "HD";
 		}
 
-		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.3f, 0.35f, 0.35f });
+		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.3f, 0.4f, 0.23f });
 		snprintf(m_buf, MAX_PATH, "%s%s %s%s",
 			prefix,
 			id,
@@ -995,9 +1090,8 @@ get_first_ipv4(PNODE node)
 static VOID
 draw_network(struct nk_context* ctx)
 {
-	nk_layout_row(ctx, NK_DYNAMIC, 0, 5, (float[5]) { 0.2f, 0.2f, 0.4f - g_ctx.gui_ratio, 0.2f, g_ctx.gui_ratio });
+	nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.64f, 0.18f - g_ctx.gui_ratio, 0.18f, g_ctx.gui_ratio });
 	nk_image_label(ctx, GET_PNG(IDR_PNG_NETWORK), N_(N__NETWORK), NK_TEXT_LEFT, g_color_text_d);
-	nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
 	nk_lhcf(ctx, NK_TEXT_LEFT, g_color_warning, u8"\u2191 %s", g_ctx.net_traffic.StrSend);
 	nk_lhcf(ctx, NK_TEXT_LEFT, g_color_unknown, u8"\u2193 %s", g_ctx.net_traffic.StrRecv);
 	if (quick_access_button(ctx, GET_PNG(IDR_PNG_EDIT), NULL))
@@ -1017,9 +1111,8 @@ draw_network(struct nk_context* ctx)
 			is_active = TRUE;
 		}
 
-		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.3f, 0.35f, 0.35f });
+		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.64f, 0.36f - g_ctx.gui_ratio, g_ctx.gui_ratio });
 		nk_lhsc(ctx, NWL_NodeAttrGet(nw, "Description"), NK_TEXT_LEFT, g_color_text_d, nk_true, nk_true);
-		nk_lhc(ctx, get_first_ipv4(nw), NK_TEXT_LEFT, g_color_text_d);
 		nk_lhc(ctx, get_first_ipv4(nw), NK_TEXT_LEFT, color);
 		if (quick_access_button(ctx,
 			strcmp(NWL_NodeAttrGet(nw, "Type"), "IEEE 802.11 Wireless") == 0 ? GET_PNG(IDR_PNG_WLAN) : GET_PNG(IDR_PNG_ETH), NULL))
@@ -1031,7 +1124,7 @@ draw_network(struct nk_context* ctx)
 
 		if (g_ctx.main_flag & MAIN_NET_DETAIL)
 		{
-			nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.3f, 0.35f, 0.35f });
+			nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.64f, 0.36f });
 			int len = snprintf(m_buf, MAX_PATH, "%s", strcmp(NWL_NodeAttrGet(nw, "DHCP Enabled"), NA_BOOL_TRUE) == 0 ? " DHCP" : "");
 			if (is_active && len >= 0 && len < MAX_PATH)
 				snprintf(m_buf + len, MAX_PATH - len, u8" \u21c5 %s / %s",
@@ -1039,20 +1132,15 @@ draw_network(struct nk_context* ctx)
 					NWL_NodeAttrGet(nw, "Receive Link Speed"));
 			nk_lhsc(ctx, m_buf, NK_TEXT_LEFT, g_color_text_d, nk_true, nk_true);
 			nk_lhc(ctx,
-				NWL_NodeAttrGet(nw, "MAC Address"), NK_TEXT_LEFT, g_color_text_d);
-			nk_lhc(ctx,
 				NWL_NodeAttrGet(nw, "MAC Address"), NK_TEXT_LEFT, g_color_text_l);
 
 			if (strcmp(NWL_NodeAttrGet(nw, "WLAN State"), "Connected") == 0)
 			{
-				nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.3f, 0.35f, 0.35f });
+				nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.64f, 0.36f });
 				nk_lhscf(ctx, NK_TEXT_LEFT, g_color_text_d, nk_true, nk_true, " %s%% %s",
 					NWL_NodeAttrGet(nw, "WLAN Signal Quality"),
 					NWL_NodeAttrGet(nw, "WLAN Profile"));
 				nk_lhscf(ctx, NK_TEXT_LEFT, g_color_text_d, nk_true, nk_false, "%s %s",
-					NWL_NodeAttrGet(nw, "WLAN Auth"),
-					NWL_NodeAttrGet(nw, "WLAN Cipher"));
-				nk_lhscf(ctx, NK_TEXT_LEFT, g_color_text_l, nk_true, nk_false, "%s %s",
 					NWL_NodeAttrGet(nw, "WLAN Auth"),
 					NWL_NodeAttrGet(nw, "WLAN Cipher"));
 			}
@@ -1067,20 +1155,14 @@ draw_audio(struct nk_context* ctx)
 	if (!g_ctx.audio)
 		return;
 
-	nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2, g_ctx.gui_ratio });
+	nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 1.0f - g_ctx.gui_ratio, g_ctx.gui_ratio });
 	nk_image_label(ctx, GET_PNG(IDR_PNG_MM), N_(N__AUDIO), NK_TEXT_LEFT, g_color_text_d);
-	nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
-	nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
 	if (quick_access_button(ctx, GET_PNG(IDR_PNG_SETTINGS), NULL))
 		ShellExecuteW(NULL, NULL, L"::{26EE0668-A00A-44D7-9371-BEB064C98683}\\2\\::{F2DDFC82-8F12-4CDD-B7DC-D4FE1425AA4D}", NULL, NULL, SW_NORMAL);
-	nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.3f, 0.35f, 0.35f });
+	nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.7f, 0.3f });
 	for (i = 0; i < g_ctx.audio_count; i++)
 	{
 		nk_lhsc(ctx, NWL_Ucs2ToUtf8(g_ctx.audio[i].name), NK_TEXT_LEFT, g_color_text_d, nk_true, nk_true);
-		nk_lhcf(ctx, NK_TEXT_LEFT, g_color_text_d,
-			"%s %.0f%%",
-			g_ctx.audio[i].is_default ? "*" : " ",
-			100.0f * g_ctx.audio[i].volume);
 		nk_lhcf(ctx, NK_TEXT_LEFT, g_color_text_l,
 			"%s %.0f%%",
 			g_ctx.audio[i].is_default ? "*" : " ",
