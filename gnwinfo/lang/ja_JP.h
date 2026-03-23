@@ -157,4 +157,6 @@ lang_ja_jp[N__MAX_] =
 	[N__FREE] = u8"空き容量",
 	[N__CLOSE] = u8"閉じる",
 	[N__INSTALL_PAWNIO] = u8"PawnIOをインストール",
+	[N__DISPLAYMAIN] = u8"表示",
+	[N__DISPLAYQUIT] = u8"終了",
 };

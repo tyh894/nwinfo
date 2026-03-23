@@ -704,6 +704,21 @@ gnwinfo_ctx_init(HINSTANCE inst, HWND wnd, struct nk_context* ctx, float width, 
 	SetTimer(g_ctx.wnd, IDT_TIMER_1S, 1000, (TIMERPROC)NULL);
 	SetTimer(g_ctx.wnd, IDT_TIMER_1M, 60 * 1000, (TIMERPROC)NULL);
 	printf("DEBUG: Timers set, init done\n");
+
+	if (g_need_save_hw_config)
+	{
+		g_need_save_hw_config = nk_false;
+		__try
+		{
+			gnwinfo_save_hw_config();
+		}
+		__except(EXCEPTION_EXECUTE_HANDLER)
+		{
+			printf("DEBUG: gnwinfo_save_hw_config - Exception caught!\n");
+		}
+	}
+
+	gnwinfo_hw_compare_init();
 }
 
 noreturn void
@@ -740,6 +755,8 @@ gnwinfo_ctx_exit(void)
 
 	if (g_ctx.audio)
 		free(g_ctx.audio);
+
+	gnwinfo_hw_compare_fini();
 
 	NWL_NodeFree(g_ctx.network, 1);
 	NWL_NodeFree(g_ctx.disk, 1);

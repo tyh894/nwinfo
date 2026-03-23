@@ -154,4 +154,7 @@ lang_zh_cn[N__MAX_] =
 	[N__FREE] = u8"空闲",
 	[N__CLOSE] = u8"关闭",
 	[N__INSTALL_PAWNIO] = u8"安装 PawnIO",
+	[N__DISPLAYMAIN] = u8"显示",
+	[N__DISPLAYQUIT] = u8"退出",
+	
 };

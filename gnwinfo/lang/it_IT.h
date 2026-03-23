@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: Unlicense
+// SPDX-License-Identifier: Unlicense
 // This file should be saved in UTF-8 **with** BOM encoding
 
 #include "../gettext.h"
@@ -37,10 +37,10 @@ lang_it_it[N__MAX_] =
 	[N__SB] = u8"Boot sicuro",
 	[N__SB_OFF] = u8"Boot sicuro disabilitato",
 	[N__TOTAL] = u8"Totale",
-	[N__FEATURES] = u8"Funzionalità",
+	[N__FEATURES] = u8"Funzionalit?",
 	//[N__MSR],
 	[N__MULTIPLIER] = u8"Moltiplicatore",
-	[N__CORE_SPEED] = u8"Velocità core",
+	[N__CORE_SPEED] = u8"Velocit? core",
 	[N__BUS_CLOCK] = u8"Clock bus",
 	[N__TEMPERATURE] = u8"Temperatura",
 	[N__VOLTAGE] = u8"Voltaggio",
@@ -79,7 +79,7 @@ lang_it_it[N__MAX_] =
 	[N__HIDE_CACHE] = u8"Nascondi cache",
 	[N__USE_SMBUS_SPD] = u8"Usa SPD",
 	[N__COMPACT_VIEW] = u8"Vista compatta",
-	[N__USE_BIT_UNITS] = u8"Use unità bit",
+	[N__USE_BIT_UNITS] = u8"Use unit? bit",
 	[N__HIDE_INACTIVE_NETWORK] = u8"Nascondi rete non attiva",
 	[N__HIDE_DETAILS] = u8"nascondi dettagli",
 	[N__HIDE_SMART] = u8"Nascondi SMART",
@@ -132,7 +132,7 @@ lang_it_it[N__MAX_] =
 	[N__MODE] = u8"Modo",
 	[N__POWER_ON_COUNT] = u8"N. accensioni",
 	[N__POWER_ON_HOURS] = u8"Ore accensione",
-	[N__DRIVE] = u8"Unità",
+	[N__DRIVE] = u8"Unit?",
 	[N__STANDARD] = u8"Standard",  // refer to the standard of the drive (e.g. SATA, NVMe)
 	//[N__ID],
 	[N__ATTRIBUTE] = u8"Attributo",
@@ -147,9 +147,9 @@ lang_it_it[N__MAX_] =
 	[N__FAILED] = u8"FALLITO",
 	[N__HOSTNAME] = u8"Nome host",
 	[N__RANDOM] = u8"Casuale",
-	[N__NETWORK_DRIVES] = u8"Unità di rete",
-	[N__NETWORK_DRIVE] = u8"Unità di rete",
-	[N__MAX_CAPACITY] = u8"Capacità max.",
+	[N__NETWORK_DRIVES] = u8"Unit? di rete",
+	[N__NETWORK_DRIVE] = u8"Unit? di rete",
+	[N__MAX_CAPACITY] = u8"Capacit? max.",
 	[N__SLOTS] = u8"slot",
 	[N__SOCKET] = u8"Socket",
 	[N__BASE_CLOCK] = u8"Clock base",
@@ -157,4 +157,6 @@ lang_it_it[N__MAX_] =
 	[N__FREE] = u8"Liberi",
 	[N__CLOSE] = u8"Chiudi",
 	[N__INSTALL_PAWNIO] = u8"Installa PawnIO",
+	[N__DISPLAYMAIN] = u8"Mostra",
+	[N__DISPLAYQUIT] = u8"Esci",
 };

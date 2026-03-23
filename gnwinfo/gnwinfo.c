@@ -31,6 +31,7 @@ nk_bool g_debug = 0;
 
 nk_bool g_tray_created = 0;
 nk_bool g_autostart = 0;
+nk_bool g_need_save_hw_config = 0;
 NOTIFYICONDATAW g_nid;
 
 static UINT m_dpi = USER_DEFAULT_SCREEN_DPI;
@@ -324,6 +325,74 @@ void gnwinfo_set_autostart(nk_bool enable)
 {
 	gnwinfo_set_autostart_internal(enable, nk_true);
 }
+
+void gnwinfo_save_hw_config(void)
+{
+	WCHAR hw_path[MAX_PATH];
+	WCHAR time_str[64];
+	time_t now;
+	struct tm tm_info;
+
+	PNODE old_root = NWLC->NwRoot;
+	int old_format = NWLC->NwFormat;
+	UINT old_codepage = NWLC->CodePage;
+	NWLC->NwRoot = NWL_NodeAlloc("NWinfo", 0);
+	NWLC->NwFormat = FORMAT_JSON;
+	NWLC->CodePage = CP_UTF8;
+
+	if (!NWLC->NwRoot)
+	{
+		NWLC->NwRoot = old_root;
+		NWLC->NwFormat = old_format;
+		NWLC->CodePage = old_codepage;
+		return;
+	}
+
+	NW_System(TRUE);
+	NW_Uefi(TRUE);
+	NW_Cpuid(TRUE);
+	NW_Smbios(TRUE);
+	__try
+	{
+		NW_Mainboard(TRUE);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+	}
+	NW_Disk(TRUE);
+	NW_Edid(TRUE);
+	NW_Pci(TRUE);
+	__try
+	{
+		NW_Spd(TRUE);
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+	}
+
+	GetModuleFileNameW(NULL, hw_path, MAX_PATH);
+	WCHAR* last_slash = wcsrchr(hw_path, L'\\');
+	if (last_slash)
+		*(last_slash + 1) = L'\0';
+
+	time(&now);
+	localtime_s(&tm_info, &now);
+	wcsftime(time_str, ARRAYSIZE(time_str), L"hw_config_%Y%m%d_%H%M%S.json", &tm_info);
+	wcscat_s(hw_path, MAX_PATH, time_str);
+
+	FILE* fp = NULL;
+	if (_wfopen_s(&fp, hw_path, L"w") == 0 && fp)
+	{
+		NW_Export(NWLC->NwRoot, fp);
+		fclose(fp);
+	}
+
+	NWL_NodeFree(NWLC->NwRoot, 1);
+	NWLC->NwRoot = old_root;
+	NWLC->NwFormat = old_format;
+	NWLC->CodePage = old_codepage;
+}
+
 static void create_tray_icon(HWND wnd)
 {
 	memset(&g_nid, 0, sizeof(NOTIFYICONDATAW));
@@ -350,9 +419,10 @@ static void remove_tray_icon(void)
 static void show_tray_menu(HWND wnd, POINT pt)
 {
 	HMENU hMenu = CreatePopupMenu();
-	AppendMenuW(hMenu, MF_STRING, ID_TRAY_SHOW, L"ÏÔÊ¾");
+	AppendMenuW(hMenu, MF_STRING, ID_TRAY_SHOW, NWL_Utf8ToUcs2(N_(N__DISPLAYMAIN)));
+	
 	AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
-	AppendMenuW(hMenu, MF_STRING, ID_TRAY_EXIT, L"ÍË³ö");
+	AppendMenuW(hMenu, MF_STRING, ID_TRAY_EXIT, NWL_Utf8ToUcs2(N_(N__DISPLAYQUIT)));
 
 	SetForegroundWindow(wnd);
 	TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, wnd, NULL);
@@ -661,6 +731,7 @@ wWinMain(_In_ HINSTANCE hInstance,
 	if (strcmp(str, "-1") == 0)
 	{
 		g_autostart = nk_false;
+		g_need_save_hw_config = nk_true;
 		__try
 		{
 			gnwinfo_set_autostart_internal(nk_true, nk_false);

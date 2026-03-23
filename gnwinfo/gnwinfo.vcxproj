@@ -175,6 +175,7 @@
   <ItemGroup>
     <ClInclude Include="..\nuklear\nuklear.h" />
     <ClInclude Include="..\nuklear\nuklear_gdip.h" />
+    <ClInclude Include="cJSON.h" />
     <ClInclude Include="gettext.h" />
     <ClInclude Include="gnwinfo.h" />
     <ClInclude Include="lang\en_US.h" />
@@ -193,6 +194,7 @@
   <ItemGroup>
     <ClCompile Include="..\nuklear\nuklear.c" />
     <ClCompile Include="about.c" />
+    <ClCompile Include="cJSON.c" />
     <ClCompile Include="context.c" />
     <ClCompile Include="cpuid.c" />
     <ClCompile Include="display.c" />
@@ -200,6 +202,7 @@
     <ClCompile Include="gettext.c" />
     <ClCompile Include="gnwinfo.c" />
     <ClCompile Include="hostname.c" />
+    <ClCompile Include="hw_compare.c" />
     <ClCompile Include="memory.c" />
     <ClCompile Include="pci.c" />
     <ClCompile Include="sensors.c" />

@@ -2,7 +2,7 @@
 
 #include "gnwinfo.h"
 
-struct nk_color g_color_warning = NK_COLOR_YELLOW;
+struct nk_color g_color_warning = NK_COLOR_RED;//NK_COLOR_YELLOW;
 struct nk_color g_color_error = NK_COLOR_RED;
 struct nk_color g_color_good = NK_COLOR_GREEN;
 struct nk_color g_color_unknown = NK_COLOR_BLUE;

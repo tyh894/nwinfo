@@ -187,6 +187,7 @@ extern nk_bool g_bginfo;
 extern nk_bool g_debug;
 extern nk_bool g_autostart;
 extern nk_bool g_tray_created;
+extern nk_bool g_need_save_hw_config;
 extern NOTIFYICONDATAW g_nid;
 
 #define NK_COLOR_YELLOW     {0xFF, 0xEA, 0x00, 0xFF}
@@ -239,3 +240,15 @@ void gnwinfo_draw_percent_prog(struct nk_context* ctx, double percent);
 nk_bool gnwinfo_get_autostart(void);
 void gnwinfo_set_autostart(nk_bool enable);
 void gnwinfo_set_autostart_internal(nk_bool enable, nk_bool show_message);
+void gnwinfo_save_hw_config(void);
+
+void gnwinfo_hw_compare_init(void);
+void gnwinfo_hw_compare_fini(void);
+nk_bool gnwinfo_hw_compare_available(void);
+LPCSTR gnwinfo_hw_compare_get_string(LPCSTR node_name, LPCSTR attr_name);
+nk_bool gnwinfo_hw_compare_get_bool(LPCSTR node_name, LPCSTR attr_name);
+LPCSTR gnwinfo_hw_compare_get_nested_string(LPCSTR node_name, LPCSTR child_name, int index, LPCSTR attr_name);
+int gnwinfo_hw_compare_get_array_size(LPCSTR node_name, LPCSTR child_name);
+nk_bool gnwinfo_hw_compare_is_different(LPCSTR current_value, LPCSTR saved_value);
+LPCSTR gnwinfo_hw_compare_get_smbios_attr(int table_type, LPCSTR attr_name);
+LPCWSTR gnwinfo_hw_compare_get_path(void);

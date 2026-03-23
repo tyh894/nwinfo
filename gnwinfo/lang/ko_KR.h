@@ -157,4 +157,6 @@ lang_ko_kr[N__MAX_] =
 	[N__FREE] = u8"??",
 	[N__CLOSE] = u8"??",
 	[N__INSTALL_PAWNIO] = u8"PawnIO ??",
+	[N__DISPLAYMAIN] = u8"Show",
+	[N__DISPLAYQUIT] = u8"Quit",
 };

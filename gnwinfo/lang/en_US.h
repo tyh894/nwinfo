@@ -156,5 +156,7 @@ lang_en_us[N__MAX_] =
 	[N__HIDE_DISK_SPACE_BAR] = u8"Hide disk space bar",
 	[N__FREE] = u8"Free",
 	[N__CLOSE] = u8"Close",
-	[N__INSTALL_PAWNIO] = u8"Install PawnIO", // install the PawnIO driver
+	[N__INSTALL_PAWNIO] = u8"Install PawnIO",
+	[N__DISPLAYMAIN] = u8"Show",
+	[N__DISPLAYQUIT] = u8"Quit",
 };
