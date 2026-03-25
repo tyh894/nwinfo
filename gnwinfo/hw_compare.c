@@ -7,6 +7,15 @@
 
 static cJSON* g_hw_json = NULL;
 static WCHAR g_hw_json_path[MAX_PATH] = {0};
+static char g_num_buf[16][32];
+static int g_num_buf_index = 0;
+
+static char* get_num_buf(void)
+{
+	char* buf = g_num_buf[g_num_buf_index % 16];
+	g_num_buf_index++;
+	return buf;
+}
 
 void gnwinfo_hw_compare_init(void)
 {
@@ -97,6 +106,84 @@ void gnwinfo_hw_compare_fini(void)
 	}
 }
 
+void gnwinfo_hw_compare_reload(void)
+{
+	WCHAR search_path[MAX_PATH];
+	WIN32_FIND_DATAW find_data;
+	HANDLE hFind;
+	FILETIME latest_time = {0};
+	WCHAR latest_file[MAX_PATH] = {0};
+
+	GetModuleFileNameW(NULL, search_path, MAX_PATH);
+	WCHAR* last_slash = wcsrchr(search_path, L'\\');
+	if (last_slash)
+		*(last_slash + 1) = L'\0';
+	else
+		return;
+
+	wcscpy_s(g_hw_json_path, MAX_PATH, search_path);
+	wcscat_s(search_path, MAX_PATH, L"hw_config_*.json");
+
+	hFind = FindFirstFileW(search_path, &find_data);
+	if (hFind == INVALID_HANDLE_VALUE)
+		return;
+
+	do
+	{
+		if (!(find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+		{
+			if (CompareFileTime(&find_data.ftLastWriteTime, &latest_time) > 0)
+			{
+				latest_time = find_data.ftLastWriteTime;
+				wcscpy_s(latest_file, MAX_PATH, find_data.cFileName);
+			}
+		}
+	} while (FindNextFileW(hFind, &find_data) != 0);
+
+	FindClose(hFind);
+
+	if (latest_file[0] != L'\0')
+	{
+		WCHAR full_path[MAX_PATH];
+		wcscpy_s(full_path, MAX_PATH, g_hw_json_path);
+		wcscat_s(full_path, MAX_PATH, latest_file);
+
+		FILE* fp = NULL;
+		if (_wfopen_s(&fp, full_path, L"rb") == 0 && fp)
+		{
+			fseek(fp, 0, SEEK_END);
+			long file_size = ftell(fp);
+			fseek(fp, 0, SEEK_SET);
+
+			char* json_buffer = (char*)malloc(file_size + 1);
+			if (json_buffer)
+			{
+				size_t read_size = fread(json_buffer, 1, file_size, fp);
+				json_buffer[read_size] = '\0';
+
+				if (g_hw_json)
+				{
+					cJSON_Delete(g_hw_json);
+					g_hw_json = NULL;
+				}
+				g_hw_json = cJSON_Parse(json_buffer);
+				if (g_hw_json)
+				{
+					wcscpy_s(g_hw_json_path, MAX_PATH, full_path);
+					printf("DEBUG: Reloaded JSON file: %S\n", latest_file);
+				}
+				else
+				{
+					printf("DEBUG: Failed to parse JSON file: %S\n", latest_file);
+				}
+
+				free(json_buffer);
+			}
+			fclose(fp);
+		}
+	}
+}
+
 nk_bool gnwinfo_hw_compare_available(void)
 {
 	return g_hw_json != NULL;
@@ -123,9 +210,12 @@ LPCSTR gnwinfo_hw_compare_get_nested_string(LPCSTR node_name, LPCSTR sub_name, L
 		return attr->valuestring;
 	if (attr->type & cJSON_Number)
 	{
-		static char num_buf[32];
-		snprintf(num_buf, sizeof(num_buf), "%d", attr->valueint);
-		return num_buf;
+		char* buf = get_num_buf();
+		if (attr->valueint == (int)attr->valuedouble)
+			snprintf(buf, 32, "%d", attr->valueint);
+		else
+			snprintf(buf, 32, "%.2f", attr->valuedouble);
+		return buf;
 	}
 
 	return NULL;
@@ -156,9 +246,12 @@ LPCSTR gnwinfo_hw_compare_get_deep_nested_string(LPCSTR node_name, LPCSTR sub_na
 		return attr->valuestring;
 	if (attr->type & cJSON_Number)
 	{
-		static char num_buf[32];
-		snprintf(num_buf, sizeof(num_buf), "%d", attr->valueint);
-		return num_buf;
+		char* buf = get_num_buf();
+		if (attr->valueint == (int)attr->valuedouble)
+			snprintf(buf, 32, "%d", attr->valueint);
+		else
+			snprintf(buf, 32, "%.2f", attr->valuedouble);
+		return buf;
 	}
 
 	return NULL;
@@ -210,19 +303,82 @@ LPCSTR gnwinfo_hw_compare_get_array_item(LPCSTR node_name, LPCSTR child_name, in
 	if (!node)
 		return NULL;
 
-	cJSON* child_array = cJSON_GetObjectItem(node, child_name);
-	if (!child_array || !(child_array->type & cJSON_Array))
-		return NULL;
+	cJSON* child = NULL;
+	if (child_name == NULL)
+	{
+		if (!(node->type & cJSON_Array))
+			return NULL;
+		child = cJSON_GetArrayItem(node, index);
+	}
+	else
+	{
+		cJSON* child_array = cJSON_GetObjectItem(node, child_name);
+		if (!child_array || !(child_array->type & cJSON_Array))
+			return NULL;
+		child = cJSON_GetArrayItem(child_array, index);
+	}
 
-	cJSON* child = cJSON_GetArrayItem(child_array, index);
 	if (!child)
 		return NULL;
 
 	cJSON* attr = cJSON_GetObjectItem(child, attr_name);
-	if (!attr || !(attr->type & cJSON_String))
+	if (!attr)
 		return NULL;
 
-	return attr->valuestring;
+	if (attr->type & cJSON_String)
+		return attr->valuestring;
+	if (attr->type & cJSON_Number)
+	{
+		char* buf = get_num_buf();
+		if (attr->valueint == (int)attr->valuedouble)
+			snprintf(buf, 32, "%d", attr->valueint);
+		else
+			snprintf(buf, 32, "%.2f", attr->valuedouble);
+		return buf;
+	}
+	return NULL;
+}
+
+LPCSTR gnwinfo_hw_compare_get_display_item(LPCSTR node_name, LPCSTR child_name, int index, LPCSTR attr_name)
+{
+	if (!g_hw_json)
+		return NULL;
+
+	cJSON* node = cJSON_GetObjectItem(g_hw_json, node_name);
+	if (!node)
+		return NULL;
+
+	cJSON* child = NULL;
+	if (child_name == NULL)
+	{
+		if (!(node->type & cJSON_Array))
+			return NULL;
+		child = cJSON_GetArrayItem(node, index);
+	}
+	else
+	{
+		cJSON* child_array = cJSON_GetObjectItem(node, child_name);
+		if (!child_array || !(child_array->type & cJSON_Array))
+			return NULL;
+		child = cJSON_GetArrayItem(child_array, index);
+	}
+
+	if (!child)
+		return NULL;
+
+	cJSON* attr = cJSON_GetObjectItem(child, attr_name);
+	if (!attr)
+		return NULL;
+
+	if (attr->type & cJSON_String)
+		return attr->valuestring;
+	if (attr->type & cJSON_Number)
+	{
+		char* buf = get_num_buf();
+		snprintf(buf, 32, "%.2f", attr->valuedouble);
+		return buf;
+	}
+	return NULL;
 }
 
 int gnwinfo_hw_compare_get_array_size(LPCSTR node_name, LPCSTR child_name)
@@ -233,6 +389,13 @@ int gnwinfo_hw_compare_get_array_size(LPCSTR node_name, LPCSTR child_name)
 	cJSON* node = cJSON_GetObjectItem(g_hw_json, node_name);
 	if (!node)
 		return 0;
+
+	if (child_name == NULL)
+	{
+		if (node->type & cJSON_Array)
+			return cJSON_GetArraySize(node);
+		return 0;
+	}
 
 	cJSON* child_array = cJSON_GetObjectItem(node, child_name);
 	if (!child_array || !(child_array->type & cJSON_Array))
@@ -281,9 +444,12 @@ LPCSTR gnwinfo_hw_compare_get_smbios_attr(int table_type, LPCSTR attr_name)
 				return attr->valuestring;
 			if (attr->type & cJSON_Number)
 			{
-				static char num_buf[32];
-				snprintf(num_buf, sizeof(num_buf), "%d", attr->valueint);
-				return num_buf;
+				char* buf = get_num_buf();
+				if (attr->valueint == (int)attr->valuedouble)
+					snprintf(buf, 32, "%d", attr->valueint);
+				else
+					snprintf(buf, 32, "%.2f", attr->valuedouble);
+				return buf;
 			}
 			return NULL;
 		}
@@ -321,9 +487,12 @@ LPCSTR gnwinfo_hw_compare_get_smbios_attr_by_index(int table_type, int index, LP
 					return attr->valuestring;
 				if (attr->type & cJSON_Number)
 				{
-					static char num_buf[32];
-					snprintf(num_buf, sizeof(num_buf), "%d", attr->valueint);
-					return num_buf;
+					char* buf = get_num_buf();
+					if (attr->valueint == (int)attr->valuedouble)
+						snprintf(buf, 32, "%d", attr->valueint);
+					else
+						snprintf(buf, 32, "%.2f", attr->valuedouble);
+					return buf;
 				}
 				return NULL;
 			}
@@ -333,7 +502,82 @@ LPCSTR gnwinfo_hw_compare_get_smbios_attr_by_index(int table_type, int index, LP
 	return NULL;
 }
 
+int gnwinfo_hw_compare_get_smbios_count(int table_type)
+{
+	if (!g_hw_json)
+		return 0;
+
+	cJSON* smbios = cJSON_GetObjectItem(g_hw_json, "SMBIOS");
+	if (!smbios || !(smbios->type & cJSON_Array))
+		return 0;
+
+	int count = 0;
+	int size = cJSON_GetArraySize(smbios);
+	for (int i = 0; i < size; i++)
+	{
+		cJSON* item = cJSON_GetArrayItem(smbios, i);
+		if (!item)
+			continue;
+
+		cJSON* type = cJSON_GetObjectItem(item, "Table Type");
+		if (type && (type->type & cJSON_Number) && type->valueint == table_type)
+			count++;
+	}
+	return count;
+}
+
 LPCWSTR gnwinfo_hw_compare_get_path(void)
 {
 	return g_hw_json_path;
+}
+
+nk_bool gnwinfo_hw_compare_check_changes(void)
+{
+	if (!g_hw_json)
+	{
+		printf("DEBUG: No JSON data available for comparison\n");
+		return nk_false;
+	}
+
+	nk_bool has_changes = nk_false;
+
+	cJSON* json = g_hw_json;
+
+	cJSON* cpu = cJSON_GetObjectItem(json, "CPU");
+	INT current_cpu_count = NWL_NodeChildCount(g_ctx.cpuid);
+	INT saved_cpu_count = cpu ? cJSON_GetArraySize(cpu) : 0;
+	printf("DEBUG: CPU count - current: %d, saved: %d\n", current_cpu_count, saved_cpu_count);
+	if (current_cpu_count != saved_cpu_count)
+		has_changes = nk_true;
+
+	cJSON* memory = cJSON_GetObjectItem(json, "Memory");
+	INT current_memory_count = NWL_NodeChildCount(g_ctx.spd);
+	INT saved_memory_count = memory ? cJSON_GetArraySize(memory) : 0;
+	printf("DEBUG: Memory count - current: %d, saved: %d\n", current_memory_count, saved_memory_count);
+	if (current_memory_count != saved_memory_count)
+		has_changes = nk_true;
+
+	cJSON* disks = cJSON_GetObjectItem(json, "Disks");
+	INT current_disk_count = NWL_NodeChildCount(g_ctx.disk);
+	INT saved_disk_count = disks ? cJSON_GetArraySize(disks) : 0;
+	printf("DEBUG: Disk count - current: %d, saved: %d\n", current_disk_count, saved_disk_count);
+	if (current_disk_count != saved_disk_count)
+		has_changes = nk_true;
+
+	cJSON* displays = cJSON_GetObjectItem(json, "Display");
+	INT current_display_count = NWL_NodeChildCount(g_ctx.edid);
+	INT saved_display_count = displays ? cJSON_GetArraySize(displays) : 0;
+	printf("DEBUG: Display count - current: %d, saved: %d\n", current_display_count, saved_display_count);
+	if (current_display_count != saved_display_count)
+		has_changes = nk_true;
+
+	cJSON* pci = cJSON_GetObjectItem(json, "PCI");
+	INT current_pci_count = NWL_NodeChildCount(g_ctx.pci);
+	INT saved_pci_count = pci ? cJSON_GetArraySize(pci) : 0;
+	printf("DEBUG: PCI count - current: %d, saved: %d\n", current_pci_count, saved_pci_count);
+	if (current_pci_count != saved_pci_count)
+		has_changes = nk_true;
+
+	printf("DEBUG: Has changes: %s\n", has_changes ? "YES" : "NO");
+	return has_changes;
 }

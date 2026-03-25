@@ -32,6 +32,8 @@ nk_bool g_debug = 0;
 nk_bool g_tray_created = 0;
 nk_bool g_autostart = 0;
 nk_bool g_need_save_hw_config = 0;
+nk_bool g_window_was_hidden = nk_true;
+nk_bool g_first_window_show = nk_true;
 NOTIFYICONDATAW g_nid;
 
 static UINT m_dpi = USER_DEFAULT_SCREEN_DPI;
@@ -119,7 +121,7 @@ void gnwinfo_set_autostart_internal(nk_bool enable, nk_bool show_message)
 	{
 		NWL_Debug("AUTOSTART", "Set: CoInitializeEx failed: 0x%08X", hr);
 		if (show_message)
-			MessageBoxW(NULL, L"初始化 COM 失败", L"自动启动设置", MB_OK | MB_ICONERROR);
+			MessageBoxW(NULL, L"????? COM ???", L"???????????", MB_OK | MB_ICONERROR);
 		return;
 	}
 
@@ -133,7 +135,7 @@ void gnwinfo_set_autostart_internal(nk_bool enable, nk_bool show_message)
 		NWL_Debug("AUTOSTART", "Set: CoCreateInstance failed: 0x%08X", hr);
 		CoUninitialize();
 		if (show_message)
-			MessageBoxW(NULL, L"创建任务计划程序失败", L"自动启动设置", MB_OK | MB_ICONERROR);
+			MessageBoxW(NULL, L"?????????????????", L"???????????", MB_OK | MB_ICONERROR);
 		return;
 	}
 
@@ -147,7 +149,7 @@ void gnwinfo_set_autostart_internal(nk_bool enable, nk_bool show_message)
 		pService->lpVtbl->Release(pService);
 		CoUninitialize();
 		if (show_message)
-			MessageBoxW(NULL, L"连接任务计划程序失败", L"自动启动设置", MB_OK | MB_ICONERROR);
+			MessageBoxW(NULL, L"?????????????????", L"???????????", MB_OK | MB_ICONERROR);
 		return;
 	}
 
@@ -161,7 +163,7 @@ void gnwinfo_set_autostart_internal(nk_bool enable, nk_bool show_message)
 		pService->lpVtbl->Release(pService);
 		CoUninitialize();
 		if (show_message)
-			MessageBoxW(NULL, L"获取任务文件夹失败", L"自动启动设置", MB_OK | MB_ICONERROR);
+			MessageBoxW(NULL, L"???????????????", L"???????????", MB_OK | MB_ICONERROR);
 		return;
 	}
 
@@ -312,11 +314,11 @@ cleanup:
 	{
 		if (enable)
 		{
-			MessageBoxW(NULL, L"自动启动设置成功！\n\n已创建任务计划程序任务\n将在用户登录时以管理员权限自动运行。", L"自动启动设置", MB_OK | MB_ICONINFORMATION);
+			MessageBoxW(NULL, L"??????????ó????\n\n???????????????????\n??????????????????????????С?", L"???????????", MB_OK | MB_ICONINFORMATION);
 		}
 		else
 		{
-			MessageBoxW(NULL, L"已删除自动启动任务", L"自动启动设置", MB_OK | MB_ICONINFORMATION);
+			MessageBoxW(NULL, L"????????????????", L"???????????", MB_OK | MB_ICONINFORMATION);
 		}
 	}
 }
@@ -332,6 +334,8 @@ void gnwinfo_save_hw_config(void)
 	WCHAR time_str[64];
 	time_t now;
 	struct tm tm_info;
+
+	printf("DEBUG: gnwinfo_save_hw_config called\n");
 
 	PNODE old_root = NWLC->NwRoot;
 	int old_format = NWLC->NwFormat;
@@ -370,6 +374,18 @@ void gnwinfo_save_hw_config(void)
 	{
 	}
 
+	PNODE display_settings = NWL_NodeAppendNew(NWLC->NwRoot, "DisplaySettings", 0);
+	if (display_settings)
+	{
+		char buf[64];
+		snprintf(buf, sizeof(buf), "%ldx%ld", g_ctx.cur_display.Width, g_ctx.cur_display.Height);
+		NWL_NodeAttrSet(display_settings, "Resolution", buf, 0);
+		snprintf(buf, sizeof(buf), "%u", g_ctx.cur_display.Dpi);
+		NWL_NodeAttrSet(display_settings, "DPI", buf, 0);
+		snprintf(buf, sizeof(buf), "%u", g_ctx.cur_display.Scale);
+		NWL_NodeAttrSet(display_settings, "Scale", buf, 0);
+	}
+
 	GetModuleFileNameW(NULL, hw_path, MAX_PATH);
 	WCHAR* last_slash = wcsrchr(hw_path, L'\\');
 	if (last_slash)
@@ -385,6 +401,11 @@ void gnwinfo_save_hw_config(void)
 	{
 		NW_Export(NWLC->NwRoot, fp);
 		fclose(fp);
+		printf("DEBUG: JSON file saved: %S\n", hw_path);
+	}
+	else
+	{
+		printf("DEBUG: Failed to save JSON file: %S\n", hw_path);
 	}
 
 	NWL_NodeFree(NWLC->NwRoot, 1);

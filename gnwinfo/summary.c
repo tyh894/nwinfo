@@ -430,9 +430,9 @@ draw_computer(struct nk_context* ctx)
 static VOID
 draw_processor(struct nk_context* ctx)
 {
-	nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) {  0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2, g_ctx.gui_ratio });
+	nk_layout_row(ctx, NK_DYNAMIC, 0, 5, (float[5]) {  0.2f, 0.4f - g_ctx.gui_ratio/2, (0.4f - g_ctx.gui_ratio/2)/2,(0.4f - g_ctx.gui_ratio/2)/2, g_ctx.gui_ratio });
 	nk_image_label(ctx, GET_PNG(IDR_PNG_CPU), N_(N__CPU), NK_TEXT_LEFT, g_color_text_d);
-	
+	nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
 	nk_lhcf(ctx, NK_TEXT_LEFT, gnwinfo_get_color(g_ctx.cpu_usage, 70.0, 90.0),
 		"%.2f%% %lu MHz",
 		g_ctx.cpu_usage,
@@ -472,7 +472,7 @@ draw_processor(struct nk_context* ctx)
 		if (!(g_ctx.main_flag & MAIN_CPU_DETAIL))
 			continue;
 
-		nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
+		nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2,g_ctx.gui_ratio });
 		nk_spacer(ctx);
 
 		int len = snprintf(m_buf, MAX_PATH, "%s %s", NWL_NodeAttrGet(cpu, "Cores"), N_(N__CORES));
@@ -612,6 +612,23 @@ draw_mem_dmi(struct nk_context* ctx)
 {
 	nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2});
 	INT count = NWL_NodeChildCount(g_ctx.smbios);
+
+	int current_device_count = 0;
+	for (INT i = 0; i < count; i++)
+	{
+		PNODE tab = NWL_NodeEnumChild(g_ctx.smbios, i);
+		LPCSTR attr = NWL_NodeAttrGet(tab, "Table Type");
+		if (strcmp(attr, "17") != 0)
+			continue;
+		LPCSTR ddr = NWL_NodeAttrGet(tab, "Device Type");
+		if (ddr[0] == '-')
+			continue;
+		current_device_count++;
+	}
+
+	int saved_device_count = gnwinfo_hw_compare_get_smbios_count(17);
+	int max_count = current_device_count > saved_device_count ? current_device_count : saved_device_count;
+
 	int device_index = 0;
 	for (INT i = 0; i < count; i++)
 	{
@@ -622,7 +639,6 @@ draw_mem_dmi(struct nk_context* ctx)
 		LPCSTR ddr = NWL_NodeAttrGet(tab, "Device Type");
 		if (ddr[0] == '-')
 			continue;
-		nk_lhsc(ctx, NWL_NodeAttrGet(tab, "Bank Locator"), NK_TEXT_LEFT, g_color_text_d, nk_true, nk_true);
 
 		LPCSTR saved_ddr = gnwinfo_hw_compare_get_smbios_attr_by_index(17, device_index, "Device Type");
 		LPCSTR saved_speed = gnwinfo_hw_compare_get_smbios_attr_by_index(17, device_index, "Speed (MT/s)");
@@ -630,43 +646,97 @@ draw_mem_dmi(struct nk_context* ctx)
 		LPCSTR saved_manuf = gnwinfo_hw_compare_get_smbios_attr_by_index(17, device_index, "Manufacturer");
 		LPCSTR saved_serial = gnwinfo_hw_compare_get_smbios_attr_by_index(17, device_index, "Serial Number");
 
-		if (gnwinfo_hw_compare_available() && saved_ddr)
-		{
-			char saved_buf[MAX_PATH] = {0};
-			snprintf(saved_buf, MAX_PATH, "%s-%s %s %s %s",
-				saved_ddr,
-				saved_speed ? saved_speed : NWL_NodeAttrGet(tab, "Speed (MT/s)"),
-				saved_size,
-				saved_manuf,
-				saved_serial);
+		nk_bool is_new = gnwinfo_hw_compare_available() && !saved_ddr;
 
-			char current_buf[MAX_PATH] = {0};
-			snprintf(current_buf, MAX_PATH, "%s-%s %s %s %s",
+		if (is_new)
+		{
+			nk_lhc(ctx, u8"新增", NK_TEXT_LEFT, g_color_warning);
+			nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_warning);
+		}
+		else
+		{
+			nk_lhsc(ctx, NWL_NodeAttrGet(tab, "Bank Locator"), NK_TEXT_LEFT, g_color_text_d, nk_true, nk_true);
+
+			if (gnwinfo_hw_compare_available() && saved_ddr)
+			{
+				char saved_buf[MAX_PATH] = {0};
+				snprintf(saved_buf, MAX_PATH, "%s-%s %s %s %s",
+					saved_ddr,
+					saved_speed ? saved_speed : NWL_NodeAttrGet(tab, "Speed (MT/s)"),
+					saved_size,
+					saved_manuf,
+					saved_serial);
+
+				char current_buf[MAX_PATH] = {0};
+				snprintf(current_buf, MAX_PATH, "%s-%s %s %s %s",
+					ddr,
+					NWL_NodeAttrGet(tab, "Speed (MT/s)"),
+					NWL_NodeAttrGet(tab, "Device Size"),
+					NWL_NodeAttrGet(tab, "Manufacturer"),
+					NWL_NodeAttrGet(tab, "Serial Number"));
+
+				if (gnwinfo_hw_compare_is_different(current_buf, saved_buf))
+					nk_lhc(ctx, saved_buf, NK_TEXT_LEFT, g_color_warning);
+				else
+					nk_lhc(ctx, saved_buf, NK_TEXT_LEFT, g_color_text_d);
+			}
+			else
+			{
+				nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
+			}
+		}
+
+		if (is_new)
+		{
+			nk_lhcf(ctx, NK_TEXT_LEFT, g_color_warning,
+				"%s-%s %s %s %s",
 				ddr,
 				NWL_NodeAttrGet(tab, "Speed (MT/s)"),
 				NWL_NodeAttrGet(tab, "Device Size"),
 				NWL_NodeAttrGet(tab, "Manufacturer"),
 				NWL_NodeAttrGet(tab, "Serial Number"));
-
-			if (gnwinfo_hw_compare_is_different(current_buf, saved_buf))
-				nk_lhc(ctx, saved_buf, NK_TEXT_LEFT, g_color_warning);
-			else
-				nk_lhc(ctx, saved_buf, NK_TEXT_LEFT, g_color_text_d);
 		}
 		else
 		{
-			nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
+			nk_lhcf(ctx, NK_TEXT_LEFT, g_color_text_l,
+				"%s-%s %s %s %s",
+				ddr,
+				NWL_NodeAttrGet(tab, "Speed (MT/s)"),
+				NWL_NodeAttrGet(tab, "Device Size"),
+				NWL_NodeAttrGet(tab, "Manufacturer"),
+				NWL_NodeAttrGet(tab, "Serial Number"));
 		}
-
-		nk_lhcf(ctx, NK_TEXT_LEFT, g_color_text_l,
-			"%s-%s %s %s %s",
-			ddr,
-			NWL_NodeAttrGet(tab, "Speed (MT/s)"),
-			NWL_NodeAttrGet(tab, "Device Size"),
-			NWL_NodeAttrGet(tab, "Manufacturer"),
-			NWL_NodeAttrGet(tab, "Serial Number"));
 		
 		device_index++;
+	}
+
+	if (gnwinfo_hw_compare_available() && saved_device_count > current_device_count)
+	{
+		for (int i = current_device_count; i < saved_device_count; i++)
+		{
+			LPCSTR saved_ddr = gnwinfo_hw_compare_get_smbios_attr_by_index(17, i, "Device Type");
+			LPCSTR saved_speed = gnwinfo_hw_compare_get_smbios_attr_by_index(17, i, "Speed (MT/s)");
+			LPCSTR saved_size = gnwinfo_hw_compare_get_smbios_attr_by_index(17, i, "Device Size");
+			LPCSTR saved_manuf = gnwinfo_hw_compare_get_smbios_attr_by_index(17, i, "Manufacturer");
+			LPCSTR saved_serial = gnwinfo_hw_compare_get_smbios_attr_by_index(17, i, "Serial Number");
+
+			if (saved_ddr)
+			{
+				nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2});
+				nk_lhc(ctx, u8"已移除", NK_TEXT_LEFT, g_color_warning);
+
+				char saved_buf[MAX_PATH] = {0};
+				snprintf(saved_buf, MAX_PATH, "%s-%s %s %s %s",
+					saved_ddr,
+					saved_speed ? saved_speed : "-",
+					saved_size,
+					saved_manuf,
+					saved_serial);
+
+				nk_lhc(ctx, saved_buf, NK_TEXT_LEFT, g_color_warning);
+				nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_warning);
+			}
+		}
 	}
 }
 
@@ -713,8 +783,9 @@ draw_mem_spd(struct nk_context* ctx)
 static VOID
 draw_memory(struct nk_context* ctx)
 {
-	nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 , g_ctx.gui_ratio });
+	nk_layout_row(ctx, NK_DYNAMIC, 0, 5, (float[5]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, (0.4f - g_ctx.gui_ratio/2)/2 , (0.4f - g_ctx.gui_ratio / 2) / 2, g_ctx.gui_ratio });
 	nk_image_label(ctx, GET_PNG(IDR_PNG_MEMORY), N_(N__MEMORY), NK_TEXT_LEFT, g_color_text_d);
+	nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
 	nk_lhcf(ctx, NK_TEXT_LEFT,
 		gnwinfo_get_color((double)g_ctx.mem_status.PhysUsage, 70.0, 90.0),
 		"%lu%% %s / %s",
@@ -732,6 +803,7 @@ draw_memory(struct nk_context* ctx)
 			draw_mem_dmi(ctx);
 	}
 }
+
 static VOID
 draw_display(struct nk_context* ctx)
 {
@@ -739,10 +811,64 @@ draw_display(struct nk_context* ctx)
 
 	nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2, g_ctx.gui_ratio });
 	nk_image_label(ctx, GET_PNG(IDR_PNG_DISPLAY), N_(N__DISPLAY), NK_TEXT_LEFT, g_color_text_d);
-	nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
-	nk_lhcf(ctx, NK_TEXT_LEFT, g_color_text_l,
-		"%ldx%ld %u DPI (%u%%)",
-		g_ctx.cur_display.Width, g_ctx.cur_display.Height, g_ctx.cur_display.Dpi, g_ctx.cur_display.Scale);
+
+	LPCSTR saved_res = gnwinfo_hw_compare_get_string("DisplaySettings", "Resolution");
+	LPCSTR saved_dpi = gnwinfo_hw_compare_get_string("DisplaySettings", "DPI");
+	LPCSTR saved_scale = gnwinfo_hw_compare_get_string("DisplaySettings", "Scale");
+
+	nk_bool is_different = nk_false;
+	if (gnwinfo_hw_compare_available() && saved_res)
+	{
+		char current_res[64] = {0};
+		snprintf(current_res, sizeof(current_res), "%ldx%ld", g_ctx.cur_display.Width, g_ctx.cur_display.Height);
+
+		char saved_buf[128] = {0};
+		if (saved_dpi && saved_scale)
+			snprintf(saved_buf, sizeof(saved_buf), "%s %sDPI (%s%%)", saved_res, saved_dpi, saved_scale);
+		else
+			snprintf(saved_buf, sizeof(saved_buf), "%s", saved_res);
+
+		is_different = gnwinfo_hw_compare_is_different(current_res, saved_res);
+
+		if (saved_dpi)
+		{
+			char current_dpi[16] = {0};
+			snprintf(current_dpi, sizeof(current_dpi), "%u", g_ctx.cur_display.Dpi);
+			if (gnwinfo_hw_compare_is_different(current_dpi, saved_dpi))
+				is_different = nk_true;
+		}
+
+		if (saved_scale)
+		{
+			char current_scale[16] = {0};
+			snprintf(current_scale, sizeof(current_scale), "%u", g_ctx.cur_display.Scale);
+			if (gnwinfo_hw_compare_is_different(current_scale, saved_scale))
+				is_different = nk_true;
+		}
+
+		if (is_different)
+			nk_lhc(ctx, saved_buf, NK_TEXT_LEFT, g_color_warning);
+		else
+			nk_lhc(ctx, saved_buf, NK_TEXT_LEFT, g_color_text_d);
+	}
+	else
+	{
+		nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
+	}
+
+	if (is_different)
+	{
+		nk_lhcf(ctx, NK_TEXT_LEFT, g_color_warning,
+			"%ldx%ld %u DPI (%u%%)",
+			g_ctx.cur_display.Width, g_ctx.cur_display.Height, g_ctx.cur_display.Dpi, g_ctx.cur_display.Scale);
+	}
+	else
+	{
+		nk_lhcf(ctx, NK_TEXT_LEFT, g_color_text_l,
+			"%ldx%ld %u DPI (%u%%)",
+			g_ctx.cur_display.Width, g_ctx.cur_display.Height, g_ctx.cur_display.Dpi, g_ctx.cur_display.Scale);
+	}
+
 	if (quick_access_button(ctx, GET_PNG(IDR_PNG_MONITOR), N_(N__DISPLAY)))
 		g_ctx.window_flag |= GUI_WINDOW_DISPLAY;
 
@@ -755,14 +881,14 @@ draw_display(struct nk_context* ctx)
 				NWLIB_GPU_DEV* gpu = &g_ctx.lib.NwGpu->Device[i];
 				CHAR name[32];
 				snprintf(name, sizeof(name), "GPU%d", i);
-				nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.3f, 0.35f, 0.35f });
+				nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2});
 
 				nk_lhsc(ctx, name, NK_TEXT_LEFT, g_color_text_d, nk_false, nk_true);
 				nk_lhc(ctx, gpu->Name, NK_TEXT_LEFT, g_color_text_d);
 				nk_lhcf(ctx, NK_TEXT_LEFT, g_color_text_l, "%s (%u%%)",
 					NWL_GetHumanSize(gpu->TotalMemory, NWLC->NwUnits, 1024), (unsigned)gpu->MemoryPercent);
 
-				nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.3f, 0.35f, 0.35f });
+				nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
 				nk_spacer(ctx);
 				nk_lhcf(ctx, NK_TEXT_LEFT, g_color_text_l,
 					u8"%.1f%% %.1fW %.1fMHz %.1fV %lluRPM",
@@ -778,7 +904,7 @@ draw_display(struct nk_context* ctx)
 			for (i = 0; i < count; i++)
 			{
 				PNODE gpu = NWL_NodeEnumChild(g_ctx.lib.NwGpu->PciList, i);
-				nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.3f, 0.35f, 0.35f });
+				nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
 				nk_lhsc(ctx, NWL_NodeAttrGet(gpu, "Vendor"), NK_TEXT_LEFT, g_color_text_d, nk_true, nk_true);
 				nk_lhc(ctx, NWL_NodeAttrGet(gpu, "Device"), NK_TEXT_LEFT, g_color_text_d);
 				nk_lhc(ctx, NWL_NodeAttrGet(gpu, "Device"), NK_TEXT_LEFT, g_color_text_l);
@@ -787,28 +913,178 @@ draw_display(struct nk_context* ctx)
 	}
 
 	INT count = NWL_NodeChildCount(g_ctx.edid);
+	int saved_display_count = gnwinfo_hw_compare_get_array_size("Display", NULL);
+	int current_display_count = 0;
 	for (i = 0; i < count; i++)
 	{
 		PNODE mon = NWL_NodeEnumChild(g_ctx.edid, i);
 		LPCSTR id = NWL_NodeAttrGet(mon, "ID");
 		if (id[0] == '-')
 			continue;
-		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.3f, 0.35f, 0.35f });
-		nk_lhsc(ctx, NWL_NodeAttrGet(mon, "Manufacturer"), NK_TEXT_LEFT, g_color_text_d, nk_true, nk_true);
-		nk_lhcf(ctx, NK_TEXT_LEFT, g_color_text_l,
-			"%s %s@%sHz %s\" %s",
-			id,
-			NWL_NodeAttrGet(mon, "Max Resolution"),
-			NWL_NodeAttrGet(mon, "Max Refresh Rate (Hz)"),
-			NWL_NodeAttrGet(mon, "Diagonal (in)"),
-			NWL_NodeAttrGet(mon, "Display Name"));
-		nk_lhcf(ctx, NK_TEXT_LEFT, g_color_text_l,
-			"%s %s@%sHz %s\" %s",
-			id,
-			NWL_NodeAttrGet(mon, "Max Resolution"),
-			NWL_NodeAttrGet(mon, "Max Refresh Rate (Hz)"),
-			NWL_NodeAttrGet(mon, "Diagonal (in)"),
-			NWL_NodeAttrGet(mon, "Display Name"));
+		current_display_count++;
+	}
+
+	int display_index = 0;
+	for (i = 0; i < count; i++)
+	{
+		PNODE mon = NWL_NodeEnumChild(g_ctx.edid, i);
+		LPCSTR id = NWL_NodeAttrGet(mon, "ID");
+		if (id[0] == '-')
+			continue;
+
+		LPCSTR saved_id = gnwinfo_hw_compare_get_array_item("Display", NULL, display_index, "ID");
+		LPCSTR saved_manuf = gnwinfo_hw_compare_get_array_item("Display", NULL, display_index, "Manufacturer");
+		LPCSTR saved_res = gnwinfo_hw_compare_get_array_item("Display", NULL, display_index, "Max Resolution");
+		LPCSTR saved_refresh = gnwinfo_hw_compare_get_display_item("Display", NULL, display_index, "Max Refresh Rate (Hz)");
+		LPCSTR saved_diag = gnwinfo_hw_compare_get_display_item("Display", NULL, display_index, "Diagonal (in)");
+		LPCSTR saved_name = gnwinfo_hw_compare_get_array_item("Display", NULL, display_index, "Display Name");
+
+		LPCSTR cur_res = NWL_NodeAttrGet(mon, "Max Resolution");
+		LPCSTR cur_refresh = NWL_NodeAttrGet(mon, "Max Refresh Rate (Hz)");
+		LPCSTR cur_diag = NWL_NodeAttrGet(mon, "Diagonal (in)");
+		LPCSTR cur_name = NWL_NodeAttrGet(mon, "Display Name");
+
+		nk_bool is_new = gnwinfo_hw_compare_available() && !saved_id;
+
+		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
+
+		if (is_new)
+		{
+			nk_lhc(ctx, u8"新增", NK_TEXT_LEFT, g_color_warning);
+			nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_warning);
+		}
+		else
+		{
+			nk_lhsc(ctx, NWL_NodeAttrGet(mon, "Manufacturer"), NK_TEXT_LEFT, g_color_text_d, nk_true, nk_true);
+
+			if (gnwinfo_hw_compare_available() && saved_id)
+		{
+			char saved_buf[MAX_PATH] = {0};
+			if (saved_name && saved_name[0] != '\0')
+				snprintf(saved_buf, MAX_PATH, "%s %s@%sHz %s\" %s",
+					saved_id,
+					saved_res ? saved_res : "-",
+					saved_refresh ? saved_refresh : "-",
+					saved_diag ? saved_diag : "-",
+					saved_name);
+			else
+				snprintf(saved_buf, MAX_PATH, "%s %s@%sHz %s\"",
+					saved_id,
+					saved_res ? saved_res : "-",
+					saved_refresh ? saved_refresh : "-",
+					saved_diag ? saved_diag : "-");
+
+			char current_buf[MAX_PATH] = {0};
+			if (cur_name && cur_name[0] != '\0')
+				snprintf(current_buf, MAX_PATH, "%s %s@%sHz %s\" %s",
+					id,
+					cur_res ? cur_res : "-",
+					cur_refresh ? cur_refresh : "-",
+					cur_diag ? cur_diag : "-",
+					cur_name);
+			else
+				snprintf(current_buf, MAX_PATH, "%s %s@%sHz %s\"",
+					id,
+					cur_res ? cur_res : "-",
+					cur_refresh ? cur_refresh : "-",
+					cur_diag ? cur_diag : "-");
+
+			if (gnwinfo_hw_compare_is_different(current_buf, saved_buf))
+				nk_lhc(ctx, saved_buf, NK_TEXT_LEFT, g_color_warning);
+			else
+				nk_lhc(ctx, saved_buf, NK_TEXT_LEFT, g_color_text_d);
+		}
+			else
+			{
+				nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
+			}
+		}
+
+		if (is_new)
+		{
+			LPCSTR cur_res = NWL_NodeAttrGet(mon, "Max Resolution");
+			LPCSTR cur_refresh = NWL_NodeAttrGet(mon, "Max Refresh Rate (Hz)");
+			LPCSTR cur_diag = NWL_NodeAttrGet(mon, "Diagonal (in)");
+			LPCSTR cur_name = NWL_NodeAttrGet(mon, "Display Name");
+
+			if (cur_name && cur_name[0] != '\0')
+				nk_lhcf(ctx, NK_TEXT_LEFT, g_color_warning,
+					"%s %s@%sHz %s\" %s",
+					id,
+					cur_res ? cur_res : "-",
+					cur_refresh ? cur_refresh : "-",
+					cur_diag ? cur_diag : "-",
+					cur_name);
+			else
+				nk_lhcf(ctx, NK_TEXT_LEFT, g_color_warning,
+					"%s %s@%sHz %s\"",
+					id,
+					cur_res ? cur_res : "-",
+					cur_refresh ? cur_refresh : "-",
+					cur_diag ? cur_diag : "-");
+		}
+		else
+		{
+			LPCSTR cur_res = NWL_NodeAttrGet(mon, "Max Resolution");
+			LPCSTR cur_refresh = NWL_NodeAttrGet(mon, "Max Refresh Rate (Hz)");
+			LPCSTR cur_diag = NWL_NodeAttrGet(mon, "Diagonal (in)");
+			LPCSTR cur_name = NWL_NodeAttrGet(mon, "Display Name");
+
+			if (cur_name && cur_name[0] != '\0')
+				nk_lhcf(ctx, NK_TEXT_LEFT, g_color_text_l,
+					"%s %s@%sHz %s\" %s",
+					id,
+					cur_res ? cur_res : "-",
+					cur_refresh ? cur_refresh : "-",
+					cur_diag ? cur_diag : "-",
+					cur_name);
+			else
+				nk_lhcf(ctx, NK_TEXT_LEFT, g_color_text_l,
+					"%s %s@%sHz %s\"",
+					id,
+					cur_res ? cur_res : "-",
+					cur_refresh ? cur_refresh : "-",
+					cur_diag ? cur_diag : "-");
+		}
+
+		display_index++;
+	}
+
+	if (gnwinfo_hw_compare_available() && saved_display_count > current_display_count)
+	{
+		for (int i = current_display_count; i < saved_display_count; i++)
+		{
+			LPCSTR saved_id = gnwinfo_hw_compare_get_array_item("Display", NULL, i, "ID");
+			LPCSTR saved_manuf = gnwinfo_hw_compare_get_array_item("Display", NULL, i, "Manufacturer");
+			LPCSTR saved_res = gnwinfo_hw_compare_get_array_item("Display", NULL, i, "Max Resolution");
+			LPCSTR saved_refresh = gnwinfo_hw_compare_get_display_item("Display", NULL, i, "Max Refresh Rate (Hz)");
+			LPCSTR saved_diag = gnwinfo_hw_compare_get_display_item("Display", NULL, i, "Diagonal (in)");
+			LPCSTR saved_name = gnwinfo_hw_compare_get_array_item("Display", NULL, i, "Display Name");
+
+			if (saved_id)
+			{
+				nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
+				nk_lhc(ctx, u8"已移除", NK_TEXT_LEFT, g_color_warning);
+
+				char saved_buf[MAX_PATH] = {0};
+				if (saved_name && saved_name[0] != '\0')
+					snprintf(saved_buf, MAX_PATH, "%s %s@%sHz %s\" %s",
+						saved_id,
+						saved_res ? saved_res : "-",
+						saved_refresh ? saved_refresh : "-",
+						saved_diag ? saved_diag : "-",
+						saved_name);
+				else
+					snprintf(saved_buf, MAX_PATH, "%s %s@%sHz %s\"",
+						saved_id,
+						saved_res ? saved_res : "-",
+						saved_refresh ? saved_refresh : "-",
+						saved_diag ? saved_diag : "-");
+
+				nk_lhc(ctx, saved_buf, NK_TEXT_LEFT, g_color_warning);
+				nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_warning);
+			}
+		}
 	}
 }
 
@@ -983,6 +1259,8 @@ draw_storage(struct nk_context* ctx)
 		g_ctx.window_flag |= GUI_WINDOW_SMART;
 
 	INT count = NWL_NodeChildCount(g_ctx.disk);
+	INT saved_disk_count = gnwinfo_hw_compare_get_array_size("Disks", NULL);
+
 	for (INT i = 0; i < count; i++)
 	{
 		BOOL cdrom;
@@ -1014,13 +1292,52 @@ draw_storage(struct nk_context* ctx)
 			prefix = "HD";
 		}
 
-		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.3f, 0.4f, 0.23f });
+		LPCSTR saved_size = gnwinfo_hw_compare_get_array_item("Disks", NULL, i, "Size");
+		LPCSTR saved_part = gnwinfo_hw_compare_get_array_item("Disks", NULL, i, "Partition Table");
+		LPCSTR saved_prod = gnwinfo_hw_compare_get_array_item("Disks", NULL, i, "Product ID");
+		nk_bool is_new = gnwinfo_hw_compare_available() && !saved_size;
+
+		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
 		snprintf(m_buf, MAX_PATH, "%s%s %s%s",
 			prefix,
 			id,
 			NWL_NodeAttrGet(disk, "Type"),
 			ssd);
-		nk_lhsc(ctx, m_buf, NK_TEXT_LEFT, g_color_text_d, nk_true, nk_true);
+		
+		if (is_new)
+		{
+			nk_lhc(ctx, m_buf, NK_TEXT_LEFT, g_color_warning);
+			nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_warning);
+		}
+		else
+		{
+			nk_lhsc(ctx, m_buf, NK_TEXT_LEFT, g_color_text_d, nk_true, nk_true);
+
+			if (gnwinfo_hw_compare_available() && saved_size)
+			{
+				char saved_buf[MAX_PATH] = {0};
+				snprintf(saved_buf, MAX_PATH, "%s %s %s",
+					saved_size,
+					saved_part ? saved_part : "-",
+					saved_prod ? saved_prod : "-");
+
+				char current_buf[MAX_PATH] = {0};
+				snprintf(current_buf, MAX_PATH, "%s %s %s",
+					NWL_NodeAttrGet(disk, "Size"),
+					NWL_NodeAttrGet(disk, "Partition Table"),
+					NWL_NodeAttrGet(disk, "Product ID"));
+
+				if (gnwinfo_hw_compare_is_different(current_buf, saved_buf))
+					nk_lhc(ctx, saved_buf, NK_TEXT_LEFT, g_color_warning);
+				else
+					nk_lhc(ctx, saved_buf, NK_TEXT_LEFT, g_color_text_d);
+			}
+			else
+			{
+				nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
+			}
+		}
+
 		nk_lhcf(ctx, NK_TEXT_LEFT,
 			g_color_text_l,
 			"%s %s %s",
@@ -1031,6 +1348,9 @@ draw_storage(struct nk_context* ctx)
 		LPCSTR health = NWL_NodeAttrGet(disk, "Health Status");
 		if ((g_ctx.main_flag & MAIN_DISK_SMART) && strcmp(health, "-") != 0)
 		{
+			nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
+			nk_spacer(ctx);
+
 			LPCSTR life = strchr(health, '(');
 			GETTEXT_STR_ID whealth = N__UNKNOWN;
 			struct nk_color color = g_color_unknown;
@@ -1050,25 +1370,136 @@ draw_storage(struct nk_context* ctx)
 				color = g_color_error;
 				whealth = N__BAD;
 			}
-			if (life == NULL)
-				life = "";
+
+			LPCSTR saved_health = gnwinfo_hw_compare_get_array_item("Disks", NULL, i, "Health Status");
+
+			if (gnwinfo_hw_compare_available() && saved_health)
+			{
+				GETTEXT_STR_ID saved_whealth = N__UNKNOWN;
+				if (strncmp(saved_health, "Good", 4) == 0)
+					saved_whealth = N__GOOD;
+				else if (strncmp(saved_health, "Caution", 7) == 0)
+					saved_whealth = N__CAUTION;
+				else if (strncmp(saved_health, "Bad", 3) == 0)
+					saved_whealth = N__BAD;
+
+				LPCSTR saved_life = strchr(saved_health, '(');
+				char saved_health_buf[MAX_PATH] = {0};
+				if (saved_life && saved_life[0] != '\0')
+				{
+					snprintf(saved_health_buf, MAX_PATH, "%s%s", N_(saved_whealth), saved_life);
+				}
+				else
+				{
+					snprintf(saved_health_buf, MAX_PATH, "%s", N_(saved_whealth));
+				}
+
+				if (gnwinfo_hw_compare_is_different(health, saved_health))
+					nk_lhc(ctx, saved_health_buf, NK_TEXT_LEFT, g_color_warning);
+				else
+					nk_lhc(ctx, saved_health_buf, NK_TEXT_LEFT, g_color_text_d);
+			}
+			else
+			{
+				nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
+			}
+
+			char current_health_buf[MAX_PATH] = {0};
+			if (life && life[0] != '\0')
+			{
+				snprintf(current_health_buf, MAX_PATH, "%s%s", N_(whealth), life);
+			}
+			else
+			{
+				snprintf(current_health_buf, MAX_PATH, "%s", N_(whealth));
+			}
 
 			nk_lhcf(ctx, NK_TEXT_LEFT, color,
-				u8"%s %s %s"TEMP_CELSIUS_SYMBOL, N_(whealth), life,
+				u8"%s %s"TEMP_CELSIUS_SYMBOL, current_health_buf,
 				temp[0] == '-' ? "-" : temp);
 		}
-		else
-			nk_spacer(ctx);
-		if (g_ctx.main_flag & MAIN_DISK_COMPACT)
-			draw_volume(ctx, disk, cdrom);
-		else
-			draw_volume_compact(ctx, disk);
+	}
+
+	if (gnwinfo_hw_compare_available() && saved_disk_count > count)
+	{
+		for (int i = count; i < saved_disk_count; i++)
+		{
+			LPCSTR saved_path = gnwinfo_hw_compare_get_array_item("Disks", NULL, i, "Path");
+			if (!saved_path)
+				continue;
+
+			LPCSTR prefix = "HD";
+			LPCSTR id = "-";
+			if (strncmp(saved_path, "\\\\.\\CdRom", 9) == 0)
+			{
+				prefix = "CD";
+				id = &saved_path[9];
+			}
+			else if (strncmp(saved_path, "\\\\.\\PhysicalDrive", 17) == 0)
+			{
+				id = &saved_path[17];
+			}
+
+			LPCSTR saved_type = gnwinfo_hw_compare_get_array_item("Disks", NULL, i, "Type");
+			LPCSTR saved_ssd = gnwinfo_hw_compare_get_array_item("Disks", NULL, i, "SSD");
+			LPCSTR saved_size = gnwinfo_hw_compare_get_array_item("Disks", NULL, i, "Size");
+			LPCSTR saved_part = gnwinfo_hw_compare_get_array_item("Disks", NULL, i, "Partition Table");
+			LPCSTR saved_prod = gnwinfo_hw_compare_get_array_item("Disks", NULL, i, "Product ID");
+
+			nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
+			nk_lhc(ctx, u8"已移除", NK_TEXT_LEFT, g_color_warning);
+
+			char saved_buf[MAX_PATH] = {0};
+			snprintf(saved_buf, MAX_PATH, "%s%s %s%s %s %s %s",
+				prefix,
+				id,
+				saved_type ? saved_type : "-",
+				saved_ssd && strcmp(saved_ssd, "false") != 0 ? " SSD" : "",
+				saved_size ? saved_size : "-",
+				saved_part ? saved_part : "-",
+				saved_prod ? saved_prod : "-");
+
+			nk_lhc(ctx, saved_buf, NK_TEXT_LEFT, g_color_warning);
+			nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_warning);
+
+			LPCSTR saved_health = gnwinfo_hw_compare_get_array_item("Disks", NULL, i, "Health Status");
+			LPCSTR saved_temp = gnwinfo_hw_compare_get_array_item("Disks", NULL, i, "Temperature (C)");
+
+			if (saved_health && saved_health[0] != '\0' && strcmp(saved_health, "-") != 0)
+			{
+				nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
+				nk_spacer(ctx);
+
+				GETTEXT_STR_ID saved_whealth = N__UNKNOWN;
+				if (strncmp(saved_health, "Good", 4) == 0)
+					saved_whealth = N__GOOD;
+				else if (strncmp(saved_health, "Caution", 7) == 0)
+					saved_whealth = N__CAUTION;
+				else if (strncmp(saved_health, "Bad", 3) == 0)
+					saved_whealth = N__BAD;
+
+				LPCSTR saved_life = strchr(saved_health, '(');
+				char saved_health_buf[MAX_PATH] = {0};
+				if (saved_life && saved_life[0] != '\0')
+				{
+					snprintf(saved_health_buf, MAX_PATH, "%s%s", N_(saved_whealth), saved_life);
+				}
+				else
+				{
+					snprintf(saved_health_buf, MAX_PATH, "%s", N_(saved_whealth));
+				}
+
+				nk_lhc(ctx, saved_health_buf, NK_TEXT_LEFT, g_color_warning);
+				nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_warning);
+			}
+		}
 	}
 	if (g_ctx.main_flag & MAIN_DISK_COMPACT)
 		draw_net_drive(ctx);
 	else
 		draw_net_drive_compact(ctx);
 }
+
 
 static LPCSTR
 get_first_ipv4(PNODE node)
@@ -1179,6 +1610,31 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 	{
 		if (strcmp(win->name_string, title) == 0)
 		{
+			// printf("DEBUG: Window found, flags: 0x%X, hidden: %s, was_hidden: %s, first_show: %s\n",
+			// 	win->flags,
+			// 	(win->flags & NK_WINDOW_HIDDEN) ? "YES" : "NO",
+			// 	g_window_was_hidden ? "YES" : "NO",
+			// 	g_first_window_show ? "YES" : "NO");
+			
+			// if (win->flags & NK_WINDOW_HIDDEN)
+			// {
+			// 	g_window_was_hidden = nk_true;
+			// 	printf("DEBUG: Window is now hidden\n");
+			// }
+			// else if (g_window_was_hidden)
+			// {
+			// 	g_window_was_hidden = nk_false;
+			// 	printf("DEBUG: Window is now shown (was hidden)\n");
+			// 	if (g_first_window_show)
+			// 	{
+			// 		printf("DEBUG: First window show detected\n");
+			// 		g_first_window_show = nk_false;
+			// 	}
+			// }
+			// else
+			// {
+			// 	printf("DEBUG: Window is shown (was not hidden)\n");
+			// }
 			win->flags &= ~NK_WINDOW_HIDDEN;
 			break;
 		}
@@ -1189,6 +1645,8 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 		nk_image_id(0), GET_PNG(IDR_PNG_CLOSE)))
 	{
 		nk_end(ctx);
+		printf("DEBUG: Window closing, setting was_hidden = YES\n");
+		// g_window_was_hidden = nk_true;
 		//InterlockedExchange(&g_ctx.exit_pending, 1);
 		ShowWindow(g_ctx.wnd, SW_HIDE);
 		return;

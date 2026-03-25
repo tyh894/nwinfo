@@ -188,6 +188,8 @@ extern nk_bool g_debug;
 extern nk_bool g_autostart;
 extern nk_bool g_tray_created;
 extern nk_bool g_need_save_hw_config;
+extern nk_bool g_window_was_hidden;
+extern nk_bool g_first_window_show;
 extern NOTIFYICONDATAW g_nid;
 
 #define NK_COLOR_YELLOW     {0xFF, 0xEA, 0x00, 0xFF}
@@ -244,14 +246,18 @@ void gnwinfo_save_hw_config(void);
 
 void gnwinfo_hw_compare_init(void);
 void gnwinfo_hw_compare_fini(void);
+void gnwinfo_hw_compare_reload(void);
 nk_bool gnwinfo_hw_compare_available(void);
 LPCSTR gnwinfo_hw_compare_get_string(LPCSTR node_name, LPCSTR attr_name);
 nk_bool gnwinfo_hw_compare_get_bool(LPCSTR node_name, LPCSTR attr_name);
 LPCSTR gnwinfo_hw_compare_get_nested_string(LPCSTR node_name, LPCSTR sub_name, LPCSTR attr_name);
 LPCSTR gnwinfo_hw_compare_get_deep_nested_string(LPCSTR node_name, LPCSTR sub_name1, LPCSTR sub_name2, LPCSTR attr_name);
 LPCSTR gnwinfo_hw_compare_get_array_item(LPCSTR node_name, LPCSTR child_name, int index, LPCSTR attr_name);
+LPCSTR gnwinfo_hw_compare_get_display_item(LPCSTR node_name, LPCSTR child_name, int index, LPCSTR attr_name);
 int gnwinfo_hw_compare_get_array_size(LPCSTR node_name, LPCSTR child_name);
 nk_bool gnwinfo_hw_compare_is_different(LPCSTR current_value, LPCSTR saved_value);
 LPCSTR gnwinfo_hw_compare_get_smbios_attr(int table_type, LPCSTR attr_name);
 LPCSTR gnwinfo_hw_compare_get_smbios_attr_by_index(int table_type, int index, LPCSTR attr_name);
+int gnwinfo_hw_compare_get_smbios_count(int table_type);
 LPCWSTR gnwinfo_hw_compare_get_path(void);
+nk_bool gnwinfo_hw_compare_check_changes(void);
