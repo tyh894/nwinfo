@@ -650,6 +650,8 @@ draw_mem_dmi(struct nk_context* ctx)
 
 		if (is_new)
 		{
+			if(g_hw_has_diff == nk_false)
+			g_hw_has_diff = nk_true;
 			nk_lhc(ctx, u8"新增", NK_TEXT_LEFT, g_color_warning);
 			nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_warning);
 		}
@@ -950,6 +952,8 @@ draw_display(struct nk_context* ctx)
 
 		if (is_new)
 		{
+			if(g_hw_has_diff == nk_false)
+			g_hw_has_diff = nk_true;
 			nk_lhc(ctx, u8"新增", NK_TEXT_LEFT, g_color_warning);
 			nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_warning);
 		}
@@ -1063,6 +1067,8 @@ draw_display(struct nk_context* ctx)
 
 			if (saved_id)
 			{
+				if(g_hw_has_diff == nk_false)
+				g_hw_has_diff = nk_true;
 				nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
 				nk_lhc(ctx, u8"已移除", NK_TEXT_LEFT, g_color_warning);
 
@@ -1306,6 +1312,8 @@ draw_storage(struct nk_context* ctx)
 		
 		if (is_new)
 		{
+			if(g_hw_has_diff == nk_false)
+			g_hw_has_diff = nk_true;
 			nk_lhc(ctx, m_buf, NK_TEXT_LEFT, g_color_warning);
 			nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_warning);
 		}
@@ -1447,6 +1455,8 @@ draw_storage(struct nk_context* ctx)
 			LPCSTR saved_prod = gnwinfo_hw_compare_get_array_item("Disks", NULL, i, "Product ID");
 
 			nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
+			if(g_hw_has_diff == nk_false)
+			g_hw_has_diff = nk_true;
 			nk_lhc(ctx, u8"已移除", NK_TEXT_LEFT, g_color_warning);
 
 			char saved_buf[MAX_PATH] = {0};
@@ -1610,31 +1620,36 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 	{
 		if (strcmp(win->name_string, title) == 0)
 		{
-			// printf("DEBUG: Window found, flags: 0x%X, hidden: %s, was_hidden: %s, first_show: %s\n",
-			// 	win->flags,
-			// 	(win->flags & NK_WINDOW_HIDDEN) ? "YES" : "NO",
-			// 	g_window_was_hidden ? "YES" : "NO",
-			// 	g_first_window_show ? "YES" : "NO");
-			
-			// if (win->flags & NK_WINDOW_HIDDEN)
-			// {
-			// 	g_window_was_hidden = nk_true;
-			// 	printf("DEBUG: Window is now hidden\n");
-			// }
-			// else if (g_window_was_hidden)
-			// {
-			// 	g_window_was_hidden = nk_false;
-			// 	printf("DEBUG: Window is now shown (was hidden)\n");
-			// 	if (g_first_window_show)
-			// 	{
-			// 		printf("DEBUG: First window show detected\n");
-			// 		g_first_window_show = nk_false;
-			// 	}
-			// }
-			// else
-			// {
-			// 	printf("DEBUG: Window is shown (was not hidden)\n");
-			// }
+			if (win->flags & NK_WINDOW_HIDDEN)
+			{
+				printf("DEBUG: Window is HIDDEN, setting was_hidden = TRUE\n");
+				g_window_was_hidden = nk_true;
+			}
+			else if (g_window_was_hidden)
+			{
+				printf("DEBUG: Window was hidden, now shown\n");
+				g_window_was_hidden = nk_false;
+				printf("DEBUG: Calling gnwinfo_hw_compare_reload()\n");
+				gnwinfo_hw_compare_reload();
+				g_hw_has_diff = nk_false;
+			}
+			else if (g_first_window_show)
+			{
+				printf("DEBUG: First window show\n");
+				g_first_window_show = nk_false;
+				
+				printf("DEBUG: gnwinfo_hw_compare_available() = %d\n", gnwinfo_hw_compare_available());
+				if (!gnwinfo_hw_compare_available())
+				{
+					printf("DEBUG: No JSON available, will save after UI render\n");
+					g_hw_has_diff = nk_true;
+				}
+				else
+				{
+					g_hw_has_diff = nk_false;
+				}
+				gnwinfo_hw_compare_reload();
+			}
 			win->flags &= ~NK_WINDOW_HIDDEN;
 			break;
 		}
@@ -1645,8 +1660,8 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 		nk_image_id(0), GET_PNG(IDR_PNG_CLOSE)))
 	{
 		nk_end(ctx);
-		printf("DEBUG: Window closing, setting was_hidden = YES\n");
-		// g_window_was_hidden = nk_true;
+		printf("DEBUG: Window closing, setting was_hidden = TRUE\n");
+		g_window_was_hidden = nk_true;
 		//InterlockedExchange(&g_ctx.exit_pending, 1);
 		ShowWindow(g_ctx.wnd, SW_HIDE);
 		return;
@@ -1713,5 +1728,21 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 		draw_audio(ctx);
 
 out:
+	if (g_hw_has_diff == nk_true)
+	{
+		if (g_ctx.disk && g_ctx.cpuid && g_ctx.pci)
+		{
+			printf("DEBUG: Hardware difference detected, saving new JSON file (disk=%p, spd=%p, edid=%p, cpuid=%p, pci=%p)\n",
+				g_ctx.disk, g_ctx.spd, g_ctx.edid, g_ctx.cpuid, g_ctx.pci);
+			gnwinfo_save_hw_config();
+			g_hw_has_diff = 2;
+		}
+		else
+		{
+			printf("DEBUG: Hardware data not ready yet, skipping save (disk=%p, spd=%p, edid=%p, cpuid=%p, pci=%p)\n",
+				g_ctx.disk, g_ctx.spd, g_ctx.edid, g_ctx.cpuid, g_ctx.pci);
+			g_hw_has_diff = nk_false;
+		}
+	}
 	nk_end(ctx);
 }

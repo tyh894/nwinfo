@@ -43,7 +43,7 @@ gnwinfo_ctx_error_callback(LPCSTR lpszText)
 static void
 gnwinfo_ctx_update_1s(void)
 {
-	printf("DEBUG: gnwinfo_ctx_update_1s - start\n");
+	// printf("DEBUG: gnwinfo_ctx_update_1s - start\n");
 	PNODE network = NULL;
 	NWLIB_MEM_INFO mem_status = { 0 };
 	NWLIB_NET_TRAFFIC net_traffic = { 0 };
@@ -70,7 +70,7 @@ gnwinfo_ctx_update_1s(void)
 		}
 		__except(EXCEPTION_EXECUTE_HANDLER)
 		{
-			printf("DEBUG: NW_Sensors - Exception caught!\n");
+			// printf("DEBUG: NW_Sensors - Exception caught!\n");
 			sensors = NULL;
 		}
 		AcquireSRWLockExclusive(&g_ctx.lock);
@@ -85,10 +85,10 @@ gnwinfo_ctx_update_1s(void)
 			}
 			__except(EXCEPTION_EXECUTE_HANDLER)
 			{
-				printf("DEBUG: NWL_NodeFree(old_sensors) - Exception caught!\n");
+				// printf("DEBUG: NWL_NodeFree(old_sensors) - Exception caught!\n");
 			}
 		}
-		printf("DEBUG: gnwinfo_ctx_update_1s - done (sensor mode)\n");
+		// printf("DEBUG: gnwinfo_ctx_update_1s - done (sensor mode)\n");
 		return;
 	}
 
@@ -104,7 +104,7 @@ gnwinfo_ctx_update_1s(void)
 	}
 	__except(EXCEPTION_EXECUTE_HANDLER)
 	{
-		printf("DEBUG: NWL_GetUptime - Exception caught!\n");
+		// printf("DEBUG: NWL_GetUptime - Exception caught!\n");
 		strcpy_s(sys_uptime, sizeof(sys_uptime), "Unknown");
 	}
 	__try
@@ -113,7 +113,7 @@ gnwinfo_ctx_update_1s(void)
 	}
 	__except(EXCEPTION_EXECUTE_HANDLER)
 	{
-		printf("DEBUG: NWL_GetMemInfo - Exception caught!\n");
+		// printf("DEBUG: NWL_GetMemInfo - Exception caught!\n");
 	}
 	__try
 	{
@@ -121,7 +121,7 @@ gnwinfo_ctx_update_1s(void)
 	}
 	__except(EXCEPTION_EXECUTE_HANDLER)
 	{
-		printf("DEBUG: NW_Network - Exception caught!\n");
+		// printf("DEBUG: NW_Network - Exception caught!\n");
 		network = NULL;
 	}
 	__try
@@ -130,7 +130,7 @@ gnwinfo_ctx_update_1s(void)
 	}
 	__except(EXCEPTION_EXECUTE_HANDLER)
 	{
-		printf("DEBUG: NWL_GetNetTraffic - Exception caught!\n");
+		// printf("DEBUG: NWL_GetNetTraffic - Exception caught!\n");
 	}
 	__try
 	{
@@ -138,7 +138,7 @@ gnwinfo_ctx_update_1s(void)
 	}
 	__except(EXCEPTION_EXECUTE_HANDLER)
 	{
-		printf("DEBUG: NWL_GetCpuUsage - Exception caught!\n");
+		// printf("DEBUG: NWL_GetCpuUsage - Exception caught!\n");
 		cpu_usage = 0.0;
 	}
 	__try
@@ -147,7 +147,7 @@ gnwinfo_ctx_update_1s(void)
 	}
 	__except(EXCEPTION_EXECUTE_HANDLER)
 	{
-		printf("DEBUG: NWL_GetCpuFreq - Exception caught!\n");
+		// printf("DEBUG: NWL_GetCpuFreq - Exception caught!\n");
 		cpu_freq = 0;
 	}
 	__try
@@ -156,7 +156,7 @@ gnwinfo_ctx_update_1s(void)
 	}
 	__except(EXCEPTION_EXECUTE_HANDLER)
 	{
-		printf("DEBUG: NWL_GetCpuMsr - Exception caught!\n");
+		// printf("DEBUG: NWL_GetCpuMsr - Exception caught!\n");
 		cpu_info = NULL;
 	}
 	__try
@@ -165,7 +165,7 @@ gnwinfo_ctx_update_1s(void)
 	}
 	__except(EXCEPTION_EXECUTE_HANDLER)
 	{
-		printf("DEBUG: NWL_GetCurDisplay - Exception caught!\n");
+		// printf("DEBUG: NWL_GetCurDisplay - Exception caught!\n");
 	}
 	if (main_flag & MAIN_INFO_AUDIO)
 	{
@@ -175,7 +175,7 @@ gnwinfo_ctx_update_1s(void)
 		}
 		__except(EXCEPTION_EXECUTE_HANDLER)
 		{
-			printf("DEBUG: NWL_GetAudio - Exception caught!\n");
+			// printf("DEBUG: NWL_GetAudio - Exception caught!\n");
 			audio = NULL;
 			audio_count = 0;
 		}
@@ -186,7 +186,7 @@ gnwinfo_ctx_update_1s(void)
 	}
 	__except(EXCEPTION_EXECUTE_HANDLER)
 	{
-		printf("DEBUG: NWL_GetMemSensors - Exception caught!\n");
+		// printf("DEBUG: NWL_GetMemSensors - Exception caught!\n");
 	}
 
 	AcquireSRWLockExclusive(&g_ctx.lock);
@@ -207,7 +207,7 @@ gnwinfo_ctx_update_1s(void)
 	}
 	__except(EXCEPTION_EXECUTE_HANDLER)
 	{
-		printf("DEBUG: NWL_GetGpuInfo - Exception caught!\n");
+		// printf("DEBUG: NWL_GetGpuInfo - Exception caught!\n");
 	}
 	NWLIB_AUDIO_DEV* old_audio = g_ctx.audio;
 	g_ctx.audio = audio;
@@ -223,7 +223,7 @@ gnwinfo_ctx_update_1s(void)
 		}
 		__except(EXCEPTION_EXECUTE_HANDLER)
 		{
-			printf("DEBUG: NWL_NodeFree(old_network) - Exception caught!\n");
+			// printf("DEBUG: NWL_NodeFree(old_network) - Exception caught!\n");
 		}
 	}
 	if (old_audio)
@@ -234,7 +234,7 @@ gnwinfo_ctx_update_1s(void)
 		}
 		__except(EXCEPTION_EXECUTE_HANDLER)
 		{
-			printf("DEBUG: free(old_audio) - Exception caught!\n");
+			// printf("DEBUG: free(old_audio) - Exception caught!\n");
 		}
 	}
 	if (old_cpu)
@@ -245,16 +245,16 @@ gnwinfo_ctx_update_1s(void)
 		}
 		__except(EXCEPTION_EXECUTE_HANDLER)
 		{
-			printf("DEBUG: free(old_cpu) - Exception caught!\n");
+			// printf("DEBUG: free(old_cpu) - Exception caught!\n");
 		}
 	}
-	printf("DEBUG: gnwinfo_ctx_update_1s - done\n");
+	// printf("DEBUG: gnwinfo_ctx_update_1s - done\n");
 }
 
 static void
 gnwinfo_ctx_update_battery(void)
 {
-	printf("DEBUG: gnwinfo_ctx_update_battery - start\n");
+	// printf("DEBUG: gnwinfo_ctx_update_battery - start\n");
 	PNODE battery = NULL;
 	__try
 	{
@@ -262,7 +262,7 @@ gnwinfo_ctx_update_battery(void)
 	}
 	__except(EXCEPTION_EXECUTE_HANDLER)
 	{
-		printf("DEBUG: NW_Battery - Exception caught!\n");
+		// printf("DEBUG: NW_Battery - Exception caught!\n");
 		battery = NULL;
 	}
 
@@ -279,16 +279,16 @@ gnwinfo_ctx_update_battery(void)
 		}
 		__except(EXCEPTION_EXECUTE_HANDLER)
 		{
-			printf("DEBUG: NWL_NodeFree(old_battery) - Exception caught!\n");
+			// printf("DEBUG: NWL_NodeFree(old_battery) - Exception caught!\n");
 		}
 	}
-	printf("DEBUG: gnwinfo_ctx_update_battery - done\n");
+	// printf("DEBUG: gnwinfo_ctx_update_battery - done\n");
 }
 
 static void
 gnwinfo_ctx_update_disk(void)
 {
-	printf("DEBUG: gnwinfo_ctx_update_disk - start\n");
+	// printf("DEBUG: gnwinfo_ctx_update_disk - start\n");
 	DWORD main_flag = 0;
 
 	AcquireSRWLockShared(&g_ctx.lock);
@@ -305,7 +305,7 @@ gnwinfo_ctx_update_disk(void)
 	}
 	__except(EXCEPTION_EXECUTE_HANDLER)
 	{
-		printf("DEBUG: NW_Disk - Exception caught!\n");
+		// printf("DEBUG: NW_Disk - Exception caught!\n");
 		disk = NULL;
 	}
 
@@ -322,16 +322,16 @@ gnwinfo_ctx_update_disk(void)
 		}
 		__except(EXCEPTION_EXECUTE_HANDLER)
 		{
-			printf("DEBUG: NWL_NodeFree(old_disk) - Exception caught!\n");
+			// printf("DEBUG: NWL_NodeFree(old_disk) - Exception caught!\n");
 		}
 	}
-	printf("DEBUG: gnwinfo_ctx_update_disk - done\n");
+	// printf("DEBUG: gnwinfo_ctx_update_disk - done\n");
 }
 
 static void
 gnwinfo_ctx_update_smb(void)
 {
-	printf("DEBUG: gnwinfo_ctx_update_smb - start\n");
+	// printf("DEBUG: gnwinfo_ctx_update_smb - start\n");
 	PNODE smb = NULL;
 	__try
 	{
@@ -339,7 +339,7 @@ gnwinfo_ctx_update_smb(void)
 	}
 	__except(EXCEPTION_EXECUTE_HANDLER)
 	{
-		printf("DEBUG: NW_NetShare - Exception caught!\n");
+		// printf("DEBUG: NW_NetShare - Exception caught!\n");
 		smb = NULL;
 	}
 
@@ -356,16 +356,16 @@ gnwinfo_ctx_update_smb(void)
 		}
 		__except(EXCEPTION_EXECUTE_HANDLER)
 		{
-			printf("DEBUG: NWL_NodeFree(old_smb) - Exception caught!\n");
+			// printf("DEBUG: NWL_NodeFree(old_smb) - Exception caught!\n");
 		}
 	}
-	printf("DEBUG: gnwinfo_ctx_update_smb - done\n");
+	// printf("DEBUG: gnwinfo_ctx_update_smb - done\n");
 }
 
 static void
 gnwinfo_ctx_update_display(void)
 {
-	printf("DEBUG: gnwinfo_ctx_update_display - start\n");
+	// printf("DEBUG: gnwinfo_ctx_update_display - start\n");
 	PNODE edid = NULL;
 	__try
 	{
@@ -373,7 +373,7 @@ gnwinfo_ctx_update_display(void)
 	}
 	__except(EXCEPTION_EXECUTE_HANDLER)
 	{
-		printf("DEBUG: NW_Edid - Exception caught!\n");
+		// printf("DEBUG: NW_Edid - Exception caught!\n");
 		edid = NULL;
 	}
 
@@ -387,7 +387,7 @@ gnwinfo_ctx_update_display(void)
 	}
 	__except(EXCEPTION_EXECUTE_HANDLER)
 	{
-		printf("DEBUG: NWL_FreeGpu - Exception caught!\n");
+		// printf("DEBUG: NWL_FreeGpu - Exception caught!\n");
 	}
 	PNODE old_edid = g_ctx.edid;
 	g_ctx.edid = edid;
@@ -399,7 +399,7 @@ gnwinfo_ctx_update_display(void)
 	}
 	__except(EXCEPTION_EXECUTE_HANDLER)
 	{
-		printf("DEBUG: NWL_InitGpu - Exception caught!\n");
+		// printf("DEBUG: NWL_InitGpu - Exception caught!\n");
 		g_ctx.lib.NwGpu = NULL;
 	}
 	__try
@@ -409,15 +409,15 @@ gnwinfo_ctx_update_display(void)
 	}
 	__except(EXCEPTION_EXECUTE_HANDLER)
 	{
-		printf("DEBUG: NWL_NodeFree(old_edid) - Exception caught!\n");
+		// printf("DEBUG: NWL_NodeFree(old_edid) - Exception caught!\n");
 	}
-	printf("DEBUG: gnwinfo_ctx_update_display - done\n");
+	// printf("DEBUG: gnwinfo_ctx_update_display - done\n");
 }
 
 static void
 gnwinfo_ctx_update_spd(void)
 {
-	printf("DEBUG: gnwinfo_ctx_update_spd - start\n");
+	// printf("DEBUG: gnwinfo_ctx_update_spd - start\n");
 	DWORD main_flag = 0;
 	AcquireSRWLockShared(&g_ctx.lock);
 	main_flag = g_ctx.main_flag;
@@ -430,7 +430,7 @@ gnwinfo_ctx_update_spd(void)
 	}
 	__except(EXCEPTION_EXECUTE_HANDLER)
 	{
-		printf("DEBUG: NW_Spd - Exception caught!\n");
+		// printf("DEBUG: NW_Spd - Exception caught!\n");
 		spd = NULL;
 	}
 
@@ -447,10 +447,10 @@ gnwinfo_ctx_update_spd(void)
 		}
 		__except(EXCEPTION_EXECUTE_HANDLER)
 		{
-			printf("DEBUG: NWL_NodeFree(old_spd) - Exception caught!\n");
+			// printf("DEBUG: NWL_NodeFree(old_spd) - Exception caught!\n");
 		}
 	}
-	printf("DEBUG: gnwinfo_ctx_update_spd - done\n");
+	// printf("DEBUG: gnwinfo_ctx_update_spd - done\n");
 }
 
 static const struct
@@ -583,8 +583,9 @@ gnwinfo_ctx_init(HINSTANCE inst, HWND wnd, struct nk_context* ctx, float width, 
 	g_ctx.lib.PciInfo = TRUE;
 	g_ctx.lib.MainboardInfo = TRUE;
 
-	if (g_debug)
-		g_ctx.lib.Debug = TRUE;
+	// Disabled NWLIB debug output even when /debug is used
+	// if (g_debug)
+	// 	g_ctx.lib.Debug = TRUE;
 
 	NW_Init(&g_ctx.lib);
 	g_ctx.lib.NwSmartFlags = ~g_ctx.smart_flag;
@@ -696,14 +697,14 @@ gnwinfo_ctx_init(HINSTANCE inst, HWND wnd, struct nk_context* ctx, float width, 
 	}
 	__except(EXCEPTION_EXECUTE_HANDLER)
 	{
-		printf("DEBUG: Exception when loading images!\n");
+		// printf("DEBUG: Exception when loading images!\n");
 	}
-	printf("DEBUG: Images loaded\n");
+	// printf("DEBUG: Images loaded\n");
 
-	printf("DEBUG: Setting timers\n");
+	// printf("DEBUG: Setting timers\n");
 	SetTimer(g_ctx.wnd, IDT_TIMER_1S, 1000, (TIMERPROC)NULL);
 	SetTimer(g_ctx.wnd, IDT_TIMER_1M, 60 * 1000, (TIMERPROC)NULL);
-	printf("DEBUG: Timers set, init done\n");
+	// printf("DEBUG: Timers set, init done\n");
 
 	if (g_need_save_hw_config)
 	{
@@ -714,7 +715,7 @@ gnwinfo_ctx_init(HINSTANCE inst, HWND wnd, struct nk_context* ctx, float width, 
 		}
 		__except(EXCEPTION_EXECUTE_HANDLER)
 		{
-			printf("DEBUG: gnwinfo_save_hw_config - Exception caught!\n");
+			// printf("DEBUG: gnwinfo_save_hw_config - Exception caught!\n");
 		}
 	}
 

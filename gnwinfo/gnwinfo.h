@@ -190,6 +190,7 @@ extern nk_bool g_tray_created;
 extern nk_bool g_need_save_hw_config;
 extern nk_bool g_window_was_hidden;
 extern nk_bool g_first_window_show;
+extern nk_bool g_hw_has_diff;
 extern NOTIFYICONDATAW g_nid;
 
 #define NK_COLOR_YELLOW     {0xFF, 0xEA, 0x00, 0xFF}

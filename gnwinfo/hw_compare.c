@@ -38,12 +38,7 @@ void gnwinfo_hw_compare_init(void)
 	hFind = FindFirstFileW(search_path, &find_data);
 	if (hFind == INVALID_HANDLE_VALUE)
 	{
-		gnwinfo_save_hw_config();
-		wcscpy_s(search_path, MAX_PATH, g_hw_json_path);
-		wcscat_s(search_path, MAX_PATH, L"hw_config_*.json");
-		hFind = FindFirstFileW(search_path, &find_data);
-		if (hFind == INVALID_HANDLE_VALUE)
-			return;
+		return;
 	}
 
 	do
@@ -114,6 +109,8 @@ void gnwinfo_hw_compare_reload(void)
 	FILETIME latest_time = {0};
 	WCHAR latest_file[MAX_PATH] = {0};
 
+	printf("DEBUG: gnwinfo_hw_compare_reload() called\n");
+
 	GetModuleFileNameW(NULL, search_path, MAX_PATH);
 	WCHAR* last_slash = wcsrchr(search_path, L'\\');
 	if (last_slash)
@@ -126,7 +123,10 @@ void gnwinfo_hw_compare_reload(void)
 
 	hFind = FindFirstFileW(search_path, &find_data);
 	if (hFind == INVALID_HANDLE_VALUE)
+	{
+		printf("DEBUG: No JSON files found\n");
 		return;
+	}
 
 	do
 	{
@@ -147,6 +147,8 @@ void gnwinfo_hw_compare_reload(void)
 		WCHAR full_path[MAX_PATH];
 		wcscpy_s(full_path, MAX_PATH, g_hw_json_path);
 		wcscat_s(full_path, MAX_PATH, latest_file);
+
+		printf("DEBUG: Found latest JSON file: %S\n", latest_file);
 
 		FILE* fp = NULL;
 		if (_wfopen_s(&fp, full_path, L"rb") == 0 && fp)
@@ -414,7 +416,14 @@ nk_bool gnwinfo_hw_compare_is_different(LPCSTR current_value, LPCSTR saved_value
 		return nk_false;
 	if (current_value[0] == '\0' || strcmp(current_value, "-") == 0)
 		return nk_false;
-	return strcmp(current_value, saved_value) != 0;
+	nk_bool is_diff = strcmp(current_value, saved_value) != 0;
+	if (is_diff)
+	{
+		if(g_hw_has_diff == nk_false)
+		g_hw_has_diff = nk_true;
+	}
+		
+	return is_diff;
 }
 
 LPCSTR gnwinfo_hw_compare_get_smbios_attr(int table_type, LPCSTR attr_name)
@@ -543,14 +552,14 @@ nk_bool gnwinfo_hw_compare_check_changes(void)
 
 	cJSON* json = g_hw_json;
 
-	cJSON* cpu = cJSON_GetObjectItem(json, "CPU");
+	cJSON* cpu = cJSON_GetObjectItem(json, "CPUID");
 	INT current_cpu_count = NWL_NodeChildCount(g_ctx.cpuid);
 	INT saved_cpu_count = cpu ? cJSON_GetArraySize(cpu) : 0;
 	printf("DEBUG: CPU count - current: %d, saved: %d\n", current_cpu_count, saved_cpu_count);
 	if (current_cpu_count != saved_cpu_count)
 		has_changes = nk_true;
 
-	cJSON* memory = cJSON_GetObjectItem(json, "Memory");
+	cJSON* memory = cJSON_GetObjectItem(json, "SPD");
 	INT current_memory_count = NWL_NodeChildCount(g_ctx.spd);
 	INT saved_memory_count = memory ? cJSON_GetArraySize(memory) : 0;
 	printf("DEBUG: Memory count - current: %d, saved: %d\n", current_memory_count, saved_memory_count);

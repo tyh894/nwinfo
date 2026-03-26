@@ -1,0 +1,50 @@
+F:\tyh_desk\上位机\内存\nwinfo\x64\Release>gnwinfo.exe /debug
+
+F:\tyh_desk\上位机\内存\nwinfo\x64\Release>DEBUG: JSON file saved: F:\tyh_desk\DEBUG: First window show
+DEBUG: gnwinfo_hw_compare_available() = 1
+DEBUG: Window closing, setting was_hidden = TRUE
+DEBUG: Window was hidden, now shown
+DEBUG: Calling gnwinfo_hw_compare_reload()
+DEBUG: gnwinfo_hw_compare_reload() called
+DEBUG: Found latest JSON file: hw_config_20260326_135626.json
+DEBUG: Reloaded JSON file: hw_config_20260326_135626.json
+DEBUG: Calling gnwinfo_hw_compare_check_changes()
+DEBUG: CPU count - current: 1, saved: 0
+DEBUG: Memory count - current: 0, saved: 0
+DEBUG: Disk count - current: 3, saved: 3
+DEBUG: Display count - current: 4, saved: 4
+DEBUG: PCI count - current: 29, saved: 29
+DEBUG: Has changes: YES
+DEBUG: has_changes = 1
+DEBUG: Saving new JSON file
+DEBUG: JSON file saved: F:\tyh_desk\DEBUG: Window closing, setting was_hidden = TRUE
+DEBUG: Window was hidden, now shown
+DEBUG: Calling gnwinfo_hw_compare_reload()
+DEBUG: gnwinfo_hw_compare_reload() called
+DEBUG: Found latest JSON file: hw_config_20260326_135632.json
+DEBUG: Reloaded JSON file: hw_config_20260326_135632.json
+DEBUG: Calling gnwinfo_hw_compare_check_changes()
+DEBUG: CPU count - current: 1, saved: 0
+DEBUG: Memory count - current: 0, saved: 0
+DEBUG: Disk count - current: 2, saved: 3
+DEBUG: Display count - current: 4, saved: 4
+DEBUG: PCI count - current: 29, saved: 29
+DEBUG: Has changes: YES
+DEBUG: has_changes = 1
+DEBUG: Saving new JSON file
+DEBUG: JSON file saved: F:\tyh_desk\DEBUG: Window closing, setting was_hidden = TRUE
+DEBUG: Window was hidden, now shown
+DEBUG: Calling gnwinfo_hw_compare_reload()
+DEBUG: gnwinfo_hw_compare_reload() called
+DEBUG: Found latest JSON file: hw_config_20260326_135655.json
+DEBUG: Reloaded JSON file: hw_config_20260326_135655.json
+DEBUG: Calling gnwinfo_hw_compare_check_changes()
+DEBUG: CPU count - current: 1, saved: 0
+DEBUG: Memory count - current: 0, saved: 0
+DEBUG: Disk count - current: 2, saved: 2
+DEBUG: Display count - current: 4, saved: 4
+DEBUG: PCI count - current: 29, saved: 29
+DEBUG: Has changes: YES
+DEBUG: has_changes = 1
+DEBUG: Saving new JSON file
+DEBUG: JSON file saved: F:\tyh_desk\
