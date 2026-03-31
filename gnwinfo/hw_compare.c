@@ -9,12 +9,18 @@ static cJSON* g_hw_json = NULL;
 static WCHAR g_hw_json_path[MAX_PATH] = {0};
 static char g_num_buf[16][32];
 static int g_num_buf_index = 0;
+static nk_bool g_need_initial_save = nk_false;
 
 static char* get_num_buf(void)
 {
 	char* buf = g_num_buf[g_num_buf_index % 16];
 	g_num_buf_index++;
 	return buf;
+}
+
+nk_bool gnwinfo_hw_compare_need_initial_save(void)
+{
+	return g_need_initial_save;
 }
 
 void gnwinfo_hw_compare_init(void)
@@ -30,7 +36,10 @@ void gnwinfo_hw_compare_init(void)
 	if (last_slash)
 		*(last_slash + 1) = L'\0';
 	else
+	{
+		g_need_initial_save = nk_true;
 		return;
+	}
 
 	wcscpy_s(g_hw_json_path, MAX_PATH, search_path);
 	wcscat_s(search_path, MAX_PATH, L"hw_config_*.json");
@@ -38,6 +47,7 @@ void gnwinfo_hw_compare_init(void)
 	hFind = FindFirstFileW(search_path, &find_data);
 	if (hFind == INVALID_HANDLE_VALUE)
 	{
+		g_need_initial_save = nk_true;
 		return;
 	}
 
@@ -83,12 +93,25 @@ void gnwinfo_hw_compare_init(void)
 				if (g_hw_json)
 				{
 					wcscpy_s(g_hw_json_path, MAX_PATH, full_path);
+					g_need_initial_save = nk_false;
+				}
+				else
+				{
+					g_need_initial_save = nk_true;
 				}
 
 				free(json_buffer);
 			}
 			fclose(fp);
 		}
+		else
+		{
+			g_need_initial_save = nk_true;
+		}
+	}
+	else
+	{
+		g_need_initial_save = nk_true;
 	}
 }
 
@@ -589,4 +612,161 @@ nk_bool gnwinfo_hw_compare_check_changes(void)
 
 	printf("DEBUG: Has changes: %s\n", has_changes ? "YES" : "NO");
 	return has_changes;
+}
+
+LPCSTR gnwinfo_hw_compare_get_pci_attr_by_hwid_location(LPCSTR hwid, LPCSTR location, LPCSTR attr_name)
+{
+	if (!g_hw_json || !hwid)
+		return NULL;
+
+	cJSON* pci = cJSON_GetObjectItem(g_hw_json, "PCI");
+	if (!pci || !(pci->type & cJSON_Array))
+		return NULL;
+
+	int size = cJSON_GetArraySize(pci);
+	for (int i = 0; i < size; i++)
+	{
+		cJSON* item = cJSON_GetArrayItem(pci, i);
+		if (!item)
+			continue;
+
+		cJSON* item_hwid = cJSON_GetObjectItem(item, "HWID");
+		cJSON* item_location = cJSON_GetObjectItem(item, "Location");
+		
+		if (item_hwid && (item_hwid->type & cJSON_String) && strcmp(item_hwid->valuestring, hwid) == 0)
+		{
+			if (location && item_location && (item_location->type & cJSON_String))
+			{
+				if (strcmp(item_location->valuestring, location) != 0)
+					continue;
+			}
+			
+			cJSON* attr = cJSON_GetObjectItem(item, attr_name);
+			if (!attr)
+				return NULL;
+
+			if (attr->type & cJSON_String)
+				return attr->valuestring;
+			if (attr->type & cJSON_Number)
+			{
+				char* buf = get_num_buf();
+				if (attr->valueint == (int)attr->valuedouble)
+					snprintf(buf, 32, "%d", attr->valueint);
+				else
+					snprintf(buf, 32, "%.2f", attr->valuedouble);
+				return buf;
+			}
+			return NULL;
+		}
+	}
+	return NULL;
+}
+
+nk_bool gnwinfo_hw_compare_pci_exists_by_hwid_location(LPCSTR hwid, LPCSTR location)
+{
+	if (!g_hw_json || !hwid)
+		return nk_false;
+
+	cJSON* pci = cJSON_GetObjectItem(g_hw_json, "PCI");
+	if (!pci || !(pci->type & cJSON_Array))
+		return nk_false;
+
+	int size = cJSON_GetArraySize(pci);
+	for (int i = 0; i < size; i++)
+	{
+		cJSON* item = cJSON_GetArrayItem(pci, i);
+		if (!item)
+			continue;
+
+		cJSON* item_hwid = cJSON_GetObjectItem(item, "HWID");
+		cJSON* item_location = cJSON_GetObjectItem(item, "Location");
+		
+		if (item_hwid && (item_hwid->type & cJSON_String) && strcmp(item_hwid->valuestring, hwid) == 0)
+		{
+			if (location && item_location && (item_location->type & cJSON_String))
+			{
+				if (strcmp(item_location->valuestring, location) == 0)
+					return nk_true;
+			}
+			else if (!location && !item_location)
+			{
+				return nk_true;
+			}
+		}
+	}
+	return nk_false;
+}
+
+int gnwinfo_hw_compare_get_pci_count(void)
+{
+	if (!g_hw_json)
+		return 0;
+
+	cJSON* pci = cJSON_GetObjectItem(g_hw_json, "PCI");
+	if (!pci || !(pci->type & cJSON_Array))
+		return 0;
+
+	return cJSON_GetArraySize(pci);
+}
+
+void gnwinfo_hw_compare_get_pci_removed_devices(void (*callback)(LPCSTR hwid, LPCSTR location, LPCSTR desc, void* userdata), void* userdata)
+{
+	if (!g_hw_json || !callback)
+		return;
+
+	cJSON* pci = cJSON_GetObjectItem(g_hw_json, "PCI");
+	if (!pci || !(pci->type & cJSON_Array))
+		return;
+
+	int size = cJSON_GetArraySize(pci);
+	for (int i = 0; i < size; i++)
+	{
+		cJSON* item = cJSON_GetArrayItem(pci, i);
+		if (!item)
+			continue;
+
+		cJSON* item_hwid = cJSON_GetObjectItem(item, "HWID");
+		if (!item_hwid || !(item_hwid->type & cJSON_String))
+			continue;
+
+		LPCSTR hwid = item_hwid->valuestring;
+		cJSON* item_location = cJSON_GetObjectItem(item, "Location");
+		LPCSTR location = (item_location && (item_location->type & cJSON_String)) ? item_location->valuestring : NULL;
+		
+		nk_bool found = nk_false;
+		INT current_count = NWL_NodeChildCount(g_ctx.pci);
+		for (INT j = 0; j < current_count; j++)
+		{
+			PNODE pci_node = NWL_NodeEnumChild(g_ctx.pci, j);
+			if (pci_node)
+			{
+				LPCSTR current_hwid = NWL_NodeAttrGet(pci_node, "HWID");
+				LPCSTR current_location = NWL_NodeAttrGet(pci_node, "Location");
+				
+				if (current_hwid && strcmp(current_hwid, hwid) == 0)
+				{
+					if (location && current_location)
+					{
+						if (strcmp(current_location, location) == 0)
+						{
+							found = nk_true;
+							break;
+						}
+					}
+					else if (!location && !current_location)
+					{
+						found = nk_true;
+						break;
+					}
+				}
+			}
+		}
+
+		if (!found)
+		{
+			cJSON* desc = cJSON_GetObjectItem(item, "Description");
+			LPCSTR desc_str = (desc && (desc->type & cJSON_String)) ? desc->valuestring : "-";
+			callback(hwid, location, desc_str, userdata);
+		}
+	}
 }

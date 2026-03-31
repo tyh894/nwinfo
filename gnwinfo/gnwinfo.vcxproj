@@ -208,6 +208,8 @@
     <ClCompile Include="sensors.c" />
     <ClCompile Include="settings.c" />
     <ClCompile Include="smart.c" />
+    <ClCompile Include="smart_history.c" />
+    <ClCompile Include="bsod.c" />
     <ClCompile Include="style.c" />
     <ClCompile Include="summary.c" />
     <ClCompile Include="utils.c" />

@@ -221,6 +221,7 @@ VOID gnwinfo_draw_about_window(struct nk_context* ctx, float width, float height
 VOID gnwinfo_draw_smart_window(struct nk_context* ctx, float width, float height);
 VOID gnwinfo_draw_settings_window(struct nk_context* ctx, float width, float height);
 VOID gnwinfo_draw_pci_window(struct nk_context* ctx, float width, float height);
+VOID draw_pci_simple(struct nk_context* ctx);
 VOID gnwinfo_draw_dmi_window(struct nk_context* ctx, float width, float height);
 VOID gnwinfo_draw_display_window(struct nk_context* ctx, float width, float height);
 VOID gnwinfo_draw_sensor_window(struct nk_context* ctx, float width, float height);
@@ -248,6 +249,7 @@ void gnwinfo_save_hw_config(void);
 void gnwinfo_hw_compare_init(void);
 void gnwinfo_hw_compare_fini(void);
 void gnwinfo_hw_compare_reload(void);
+nk_bool gnwinfo_hw_compare_need_initial_save(void);
 nk_bool gnwinfo_hw_compare_available(void);
 LPCSTR gnwinfo_hw_compare_get_string(LPCSTR node_name, LPCSTR attr_name);
 nk_bool gnwinfo_hw_compare_get_bool(LPCSTR node_name, LPCSTR attr_name);
@@ -262,3 +264,19 @@ LPCSTR gnwinfo_hw_compare_get_smbios_attr_by_index(int table_type, int index, LP
 int gnwinfo_hw_compare_get_smbios_count(int table_type);
 LPCWSTR gnwinfo_hw_compare_get_path(void);
 nk_bool gnwinfo_hw_compare_check_changes(void);
+LPCSTR gnwinfo_hw_compare_get_pci_attr_by_hwid_location(LPCSTR hwid, LPCSTR location, LPCSTR attr_name);
+nk_bool gnwinfo_hw_compare_pci_exists_by_hwid_location(LPCSTR hwid, LPCSTR location);
+int gnwinfo_hw_compare_get_pci_count(void);
+void gnwinfo_hw_compare_get_pci_removed_devices(void (*callback)(LPCSTR hwid, LPCSTR location, LPCSTR desc, void* userdata), void* userdata);
+
+void gnwinfo_smart_history_init(void);
+void gnwinfo_smart_history_fini(void);
+void gnwinfo_save_smart_history(void);
+void gnwinfo_load_smart_history(void);
+int gnwinfo_get_smart_history_count(void);
+const char* gnwinfo_get_smart_history_filename(int index);
+int gnwinfo_get_smart_history_rows(int index);
+int gnwinfo_get_smart_history_cols(int index);
+const char* gnwinfo_get_smart_history_cell(int index, int row, int col);
+
+#include "bsod.h"

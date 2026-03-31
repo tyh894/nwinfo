@@ -41,6 +41,7 @@
 #define IDT_TIMER_POWER                 (1u << 4)
 #define IDT_TIMER_SMB                   (1u << 5)
 #define IDT_TIMER_SPD                   (1u << 6)
+#define IDT_TIMER_SMART_HISTORY         (1u << 7)
 
 // Next default values for new objects
 // 

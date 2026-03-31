@@ -422,6 +422,46 @@ cdi_get_smart_value(CDI_SMART * ptr, INT index, INT attr, BOOL hex)
 	return cs_to_wcs(cstr);
 }
 
+extern "C" BYTE WINAPI
+cdi_get_smart_current_value(CDI_SMART * ptr, INT index, INT attr)
+{
+	if (ptr == NULL || index < 0 || attr < 0)
+		return 0;
+	return ptr->vars[index].Attribute[attr].CurrentValue;
+}
+
+extern "C" UINT64 WINAPI
+cdi_get_smart_raw_value(CDI_SMART * ptr, INT index, INT attr)
+{
+	if (ptr == NULL || index < 0 || attr < 0)
+		return 0;
+	
+	SMART_ATTRIBUTE* data = &ptr->vars[index].Attribute[attr];
+	UINT64 raw = ((UINT64)data->RawValue[5] << 40) +
+		((UINT64)data->RawValue[4] << 32) +
+		((UINT64)data->RawValue[3] << 24) +
+		((UINT64)data->RawValue[2] << 16) +
+		((UINT64)data->RawValue[1] << 8) +
+		((UINT64)data->RawValue[0]);
+	return raw;
+}
+
+extern "C" DWORD WINAPI
+cdi_get_disk_vendor_id(CDI_SMART * ptr, INT index)
+{
+	if (ptr == NULL || index < 0)
+		return 0;
+	return ptr->vars[index].DiskVendorId;
+}
+
+extern "C" BOOL WINAPI
+cdi_get_is_nvme(CDI_SMART * ptr, INT index)
+{
+	if (ptr == NULL || index < 0)
+		return FALSE;
+	return ptr->vars[index].IsNVMe;
+}
+
 // DiskInfoDlgUpdate.cpp
 // BOOL CDiskInfoDlg::UpdateListCtrl(DWORD i)
 extern "C" INT WINAPI

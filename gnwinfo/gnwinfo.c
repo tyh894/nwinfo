@@ -638,29 +638,9 @@ window_proc(HWND wnd, UINT msg, WPARAM wparam, LPARAM lparam)
 		if (!g_bginfo)
 		{
 			RECT rect = { 0 };
-			LONG result = 0;
 			LONG x = GET_X_LPARAM(lparam);
 			LONG y = GET_Y_LPARAM(lparam);
-			LONG w = GetSystemMetricsForDpi(SM_CXFRAME, USER_DEFAULT_SCREEN_DPI)
-				+ GetSystemMetricsForDpi(SM_CXPADDEDBORDER, USER_DEFAULT_SCREEN_DPI);
-			LONG h = GetSystemMetricsForDpi(SM_CYFRAME, USER_DEFAULT_SCREEN_DPI)
-				+ GetSystemMetricsForDpi(SM_CXPADDEDBORDER, USER_DEFAULT_SCREEN_DPI);
 			GetWindowRect(wnd, &rect);
-			result = REGION_MASK_LEFT * (x < (rect.left + w)) |
-				REGION_MASK_RIGHT * (x >= (rect.right - w)) |
-				REGION_MASK_TOP * (y < (rect.top + h)) |
-				REGION_MASK_BOTTOM * (y >= (rect.bottom - h));
-			switch (result)
-			{
-			case REGION_MASK_LEFT: return HTLEFT;
-			case REGION_MASK_RIGHT: return HTRIGHT;
-			case REGION_MASK_TOP: return HTTOP;
-			case REGION_MASK_BOTTOM: return HTBOTTOM;
-			case REGION_MASK_TOP | REGION_MASK_LEFT: return HTTOPLEFT;
-			case REGION_MASK_TOP | REGION_MASK_RIGHT: return HTTOPRIGHT;
-			case REGION_MASK_BOTTOM | REGION_MASK_LEFT: return HTBOTTOMLEFT;
-			case REGION_MASK_BOTTOM | REGION_MASK_RIGHT: return HTBOTTOMRIGHT;
-			}
 			if (y <= (LONG)(rect.top + g_ctx.gui_title) &&
 				x <= (LONG)(rect.right - 3 * g_ctx.gui_title))
 				return HTCAPTION;

@@ -18,3 +18,7 @@ cdi_get_smart_id
 cdi_get_smart_value
 cdi_get_smart_status
 cdi_get_smart_name
+cdi_get_smart_current_value
+cdi_get_smart_raw_value
+cdi_get_disk_vendor_id
+cdi_get_is_nvme

@@ -126,8 +126,8 @@ draw_os(struct nk_context* ctx)
 			strcmp(NWL_NodeAttrGet(g_ctx.system, "VHD Boot"), NA_BOOL_TRUE) == 0 ? " VHD" : "",
 			strcmp(NWL_NodeAttrGet(g_ctx.system, "Fast Startup"), NA_BOOL_TRUE) == 0 ? " FastStartup" : "");
 		
-		if (quick_access_button(ctx, GET_PNG(IDR_PNG_EDIT), N_(N__HOSTNAME)))
-			gnwinfo_init_hostname_window(ctx);
+		// if (quick_access_button(ctx, GET_PNG(IDR_PNG_EDIT), N_(N__HOSTNAME)))
+		// 	gnwinfo_init_hostname_window(ctx);
 	}
 
 	if (g_ctx.main_flag & MAIN_OS_UPTIME)
@@ -253,8 +253,8 @@ draw_bios(struct nk_context* ctx)
 
 	nk_lhc(ctx, m_buf, NK_TEXT_LEFT, g_color_text_l);
 
-	if (quick_access_button(ctx, GET_PNG(IDR_PNG_DMI), "SMBIOS"))
-		g_ctx.window_flag |= GUI_WINDOW_DMI;
+	// if (quick_access_button(ctx, GET_PNG(IDR_PNG_DMI), "SMBIOS"))
+	// 	g_ctx.window_flag |= GUI_WINDOW_DMI;
 
 	if (g_ctx.main_flag & MAIN_B_VENDOR)
 	{
@@ -1611,6 +1611,7 @@ draw_audio(struct nk_context* ctx)
 	}
 }
 
+static int display_interface = 0;
 VOID
 gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 {
@@ -1667,22 +1668,14 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 		return;
 	}
 
-	nk_layout_row_begin(ctx, NK_DYNAMIC, 0, 5);
+	nk_layout_row_begin(ctx, NK_DYNAMIC, 0, 6);
 
 	struct nk_rect rect = nk_layout_widget_bounds(ctx);
 	g_ctx.gui_ratio = rect.h / rect.w;
 
 	nk_layout_row_push(ctx, g_ctx.gui_ratio);
-	if (g_ctx.window_flag & GUI_WINDOW_SENSOR)
-	{
-		if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_PC), N_(N__SUMMARY_VIEW)))
-			g_ctx.window_flag &= ~GUI_WINDOW_SENSOR;
-	}
-	else
-	{
-		if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_SENSOR), N_(N__SENSOR_VIEW)))
-			g_ctx.window_flag |= GUI_WINDOW_SENSOR;
-	}
+	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_SENSOR), N_(N__SENSOR_VIEW)))
+		display_interface = 0;
 	nk_layout_row_push(ctx, g_ctx.gui_ratio);
 	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_SETTINGS), N_(N__SETTINGS)))
 		g_ctx.window_flag |= GUI_WINDOW_SETTINGS;
@@ -1698,13 +1691,139 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_INFO), N_(N__ABOUT)))
 		g_ctx.window_flag |= GUI_WINDOW_ABOUT;
 	nk_layout_row_push(ctx, g_ctx.gui_ratio);
+	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_PCI), u8"测试"))
+		display_interface = 1;
+	nk_layout_row_push(ctx, g_ctx.gui_ratio);
+	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_PCI), u8"蓝屏"))
+		display_interface = 2;
+	nk_layout_row_push(ctx, g_ctx.gui_ratio);
 	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_CLOSE), N_(N__CLOSE)))
 		InterlockedExchange(&g_ctx.exit_pending, 1);
 	nk_layout_row_end(ctx);
 
-	if (g_ctx.window_flag & GUI_WINDOW_SENSOR)
+	if (display_interface == 1)
 	{
-		gnwinfo_draw_sensor_window(ctx, width, height);
+		static int selected_csv = 0;
+		gnwinfo_load_smart_history();
+		int csv_count = gnwinfo_get_smart_history_count();
+		
+		if (csv_count == 0) {
+			nk_layout_row(ctx, NK_DYNAMIC, 0, 1, (float[1]) { 1.0f });
+			nk_lhc(ctx, u8"没有找到SMART历史数据文件", NK_TEXT_LEFT, g_color_text_l);
+		} else {
+			for (int i = 0; i < csv_count; i++) {
+				if (i % 4 == 0) {
+					nk_layout_row(ctx, NK_DYNAMIC, 30, 4, (float[4]) { 0.25f, 0.25f, 0.25f, 0.25f });
+				}
+				const char* filename = gnwinfo_get_smart_history_filename(i);
+				if (filename) {
+					const char* basename = strrchr(filename, '\\');
+					if (basename) basename++;
+					else basename = filename;
+					
+					char display_name[64] = {0};
+					const char* underscore = strchr(basename, '_');
+					if (underscore) {
+						underscore++;
+						const char* diskdata = strstr(underscore, "_diskdata");
+						if (diskdata) {
+							int len = (int)(diskdata - underscore);
+							if (len > 0 && len < 64) {
+								strncpy_s(display_name, sizeof(display_name), underscore, len);
+							}
+						}
+					}
+					if (display_name[0] == '\0') {
+						strcpy_s(display_name, sizeof(display_name), basename);
+					}
+					
+					if (nk_button_label(ctx, display_name)) {
+						selected_csv = i;
+					}
+				}
+			}
+			
+			nk_layout_row(ctx, NK_DYNAMIC, 10, 1, (float[1]) { 1.0f });
+			
+			int rows = gnwinfo_get_smart_history_rows(selected_csv);
+			int cols = gnwinfo_get_smart_history_cols(selected_csv);
+			
+			if (rows > 0 && cols > 0) {
+				float col_width = 280.0f;
+				float time_width = 180.0f;
+				
+				nk_layout_row_begin(ctx, NK_STATIC, 0, cols);
+				for (int c = 0; c < cols; c++) {
+					float width = (c == 0) ? time_width : col_width;
+					nk_layout_row_push(ctx, width);
+					const char* cell = gnwinfo_get_smart_history_cell(selected_csv, 0, c);
+					if (cell)
+						nk_lhc(ctx, cell, NK_TEXT_LEFT, g_color_text_d);
+					else
+						nk_lhc(ctx, "", NK_TEXT_LEFT, g_color_text_d);
+				}
+				nk_layout_row_end(ctx);
+				
+				for (int r = rows - 1; r >= 1; r--) {
+					nk_layout_row_begin(ctx, NK_STATIC, 0, cols);
+					for (int c = 0; c < cols; c++) {
+						float width = (c == 0) ? time_width : col_width;
+						nk_layout_row_push(ctx, width);
+						const char* cell = gnwinfo_get_smart_history_cell(selected_csv, r, c);
+						if (cell)
+							nk_lhc(ctx, cell, NK_TEXT_LEFT, g_color_text_l);
+						else
+							nk_lhc(ctx, "", NK_TEXT_LEFT, g_color_text_l);
+					}
+					nk_layout_row_end(ctx);
+				}
+			}
+		}
+		goto out;
+	}
+
+	if (display_interface == 2)
+	{
+		int bsod_count = gnwinfo_bsod_get_record_count();
+		
+		if (bsod_count == 0) {
+			nk_layout_row(ctx, NK_DYNAMIC, 0, 1, (float[1]) { 1.0f });
+			nk_lhc(ctx, u8"没有检测到蓝屏记录", NK_TEXT_LEFT, g_color_text_l);
+		} else {
+			nk_layout_row(ctx, NK_DYNAMIC, 0, 1, (float[1]) { 1.0f });
+			nk_lhcf(ctx, NK_TEXT_LEFT, g_color_text_d, u8"检测到 %d 条蓝屏记录", bsod_count);
+			
+			nk_layout_row(ctx, NK_DYNAMIC, 10, 1, (float[1]) { 1.0f });
+			
+			for (int i = 0; i < bsod_count; i++) {
+				const BSOD_RECORD* record = gnwinfo_bsod_get_record(i);
+				if (record == NULL)
+					continue;
+				
+				nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.2f, 0.8f });
+				nk_lhc(ctx, u8"时间:", NK_TEXT_LEFT, g_color_text_d);
+				nk_lhc(ctx, record->timestamp, NK_TEXT_LEFT, g_color_text_l);
+				
+				nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.2f, 0.8f });
+				nk_lhc(ctx, u8"错误码:", NK_TEXT_LEFT, g_color_text_d);
+				nk_lhcf(ctx, NK_TEXT_LEFT, g_color_warning, "%s (%s)", record->bugcheck_code, record->bugcheck_name);
+				
+				nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.2f, 0.8f });
+				nk_lhc(ctx, u8"描述:", NK_TEXT_LEFT, g_color_text_d);
+				nk_lhc(ctx, gnwinfo_bsod_get_code_desc(record->bugcheck_id), NK_TEXT_LEFT, g_color_text_l);
+				
+				if (record->dump_file[0] != '\0') {
+					nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.2f, 0.8f });
+					nk_lhc(ctx, u8"转储文件:", NK_TEXT_LEFT, g_color_text_d);
+					const char* basename = strrchr(record->dump_file, '\\');
+					if (basename) basename++;
+					else basename = record->dump_file;
+					nk_lhc(ctx, basename, NK_TEXT_LEFT, g_color_text_l);
+				}
+				
+				nk_layout_row(ctx, NK_DYNAMIC, 10, 1, (float[1]) { 1.0f });
+			}
+		}
 		goto out;
 	}
 
@@ -1726,6 +1845,7 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 		draw_network(ctx);
 	if (g_ctx.main_flag & MAIN_INFO_AUDIO)
 		draw_audio(ctx);
+	draw_pci_simple(ctx);
 
 out:
 	if (g_hw_has_diff == nk_true)

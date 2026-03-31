@@ -466,6 +466,7 @@ static const struct
 	{ IDT_TIMER_POWER, gnwinfo_ctx_update_battery },
 	{ IDT_TIMER_SMB, gnwinfo_ctx_update_smb },
 	{ IDT_TIMER_SPD, gnwinfo_ctx_update_spd },
+	{ IDT_TIMER_SMART_HISTORY, gnwinfo_save_smart_history },
 };
 
 static void
@@ -704,6 +705,7 @@ gnwinfo_ctx_init(HINSTANCE inst, HWND wnd, struct nk_context* ctx, float width, 
 	// printf("DEBUG: Setting timers\n");
 	SetTimer(g_ctx.wnd, IDT_TIMER_1S, 1000, (TIMERPROC)NULL);
 	SetTimer(g_ctx.wnd, IDT_TIMER_1M, 60 * 1000, (TIMERPROC)NULL);
+	SetTimer(g_ctx.wnd, IDT_TIMER_SMART_HISTORY, 30 * 1000, (TIMERPROC)NULL);
 	// printf("DEBUG: Timers set, init done\n");
 
 	if (g_need_save_hw_config)
@@ -720,6 +722,20 @@ gnwinfo_ctx_init(HINSTANCE inst, HWND wnd, struct nk_context* ctx, float width, 
 	}
 
 	gnwinfo_hw_compare_init();
+	gnwinfo_smart_history_init();
+	gnwinfo_bsod_init();
+	
+	if (gnwinfo_hw_compare_need_initial_save())
+	{
+		__try
+		{
+			gnwinfo_save_hw_config();
+			gnwinfo_hw_compare_reload();
+		}
+		__except(EXCEPTION_EXECUTE_HANDLER)
+		{
+		}
+	}
 }
 
 noreturn void
@@ -727,6 +743,7 @@ gnwinfo_ctx_exit(void)
 {
 	KillTimer(g_ctx.wnd, IDT_TIMER_1S);
 	KillTimer(g_ctx.wnd, IDT_TIMER_1M);
+	KillTimer(g_ctx.wnd, IDT_TIMER_SMART_HISTORY);
 
 	if (g_ctx.update_event)
 	{
@@ -758,6 +775,8 @@ gnwinfo_ctx_exit(void)
 		free(g_ctx.audio);
 
 	gnwinfo_hw_compare_fini();
+	gnwinfo_smart_history_fini();
+	gnwinfo_bsod_fini();
 
 	NWL_NodeFree(g_ctx.network, 1);
 	NWL_NodeFree(g_ctx.disk, 1);

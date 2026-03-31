@@ -194,6 +194,10 @@ BYTE		WINAPI cdi_get_smart_id(CDI_SMART* ptr, INT index, INT attr);
 WCHAR*		WINAPI cdi_get_smart_value(CDI_SMART* ptr, INT index, INT attr, BOOL hex);
 INT			WINAPI cdi_get_smart_status(CDI_SMART* ptr, INT index, INT attr);
 WCHAR*		WINAPI cdi_get_smart_name(CDI_SMART* ptr, INT index, BYTE id);
+BYTE		WINAPI cdi_get_smart_current_value(CDI_SMART* ptr, INT index, INT attr);
+UINT64		WINAPI cdi_get_smart_raw_value(CDI_SMART* ptr, INT index, INT attr);
+DWORD		WINAPI cdi_get_disk_vendor_id(CDI_SMART* ptr, INT index);
+BOOL		WINAPI cdi_get_is_nvme(CDI_SMART* ptr, INT index);
 
 static inline LPCSTR
 cdi_get_health_status(enum CDI_DISK_STATUS status)

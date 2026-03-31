@@ -23,6 +23,10 @@ static struct
 	WCHAR* (WINAPI* cdi_get_smart_value)(CDI_SMART* ptr, INT index, INT attr, BOOL hex);
 	INT (WINAPI* cdi_get_smart_status)(CDI_SMART* ptr, INT index, INT attr);
 	WCHAR* (WINAPI* cdi_get_smart_name)(CDI_SMART* ptr, INT index, BYTE id);
+	BYTE (WINAPI* cdi_get_smart_current_value)(CDI_SMART* ptr, INT index, INT attr);
+	UINT64 (WINAPI* cdi_get_smart_raw_value)(CDI_SMART* ptr, INT index, INT attr);
+	DWORD (WINAPI* cdi_get_disk_vendor_id)(CDI_SMART* ptr, INT index);
+	BOOL (WINAPI* cdi_get_is_nvme)(CDI_SMART* ptr, INT index);
 } m_cdi;
 
 #ifdef _WIN64
@@ -57,6 +61,10 @@ CDI_SMART* WINAPI cdi_create_smart(VOID)
 	*(FARPROC*)&m_cdi.cdi_get_smart_value = GetProcAddress(m_cdi.dll, "cdi_get_smart_value");
 	*(FARPROC*)&m_cdi.cdi_get_smart_status = GetProcAddress(m_cdi.dll, "cdi_get_smart_status");
 	*(FARPROC*)&m_cdi.cdi_get_smart_name = GetProcAddress(m_cdi.dll, "cdi_get_smart_name");
+	*(FARPROC*)&m_cdi.cdi_get_smart_current_value = GetProcAddress(m_cdi.dll, "cdi_get_smart_current_value");
+	*(FARPROC*)&m_cdi.cdi_get_smart_raw_value = GetProcAddress(m_cdi.dll, "cdi_get_smart_raw_value");
+	*(FARPROC*)&m_cdi.cdi_get_disk_vendor_id = GetProcAddress(m_cdi.dll, "cdi_get_disk_vendor_id");
+	*(FARPROC*)&m_cdi.cdi_get_is_nvme = GetProcAddress(m_cdi.dll, "cdi_get_is_nvme");
 	if (m_cdi.cdi_create_smart == NULL)
 		goto fail;
 	return m_cdi.cdi_create_smart();
@@ -173,4 +181,32 @@ WCHAR* WINAPI cdi_get_smart_name(CDI_SMART* ptr, INT index, BYTE id)
 	if (m_cdi.cdi_get_smart_name == NULL)
 		return NULL;
 	return m_cdi.cdi_get_smart_name(ptr, index, id);
+}
+
+BYTE WINAPI cdi_get_smart_current_value(CDI_SMART* ptr, INT index, INT attr)
+{
+	if (m_cdi.cdi_get_smart_current_value == NULL)
+		return 0;
+	return m_cdi.cdi_get_smart_current_value(ptr, index, attr);
+}
+
+UINT64 WINAPI cdi_get_smart_raw_value(CDI_SMART* ptr, INT index, INT attr)
+{
+	if (m_cdi.cdi_get_smart_raw_value == NULL)
+		return 0;
+	return m_cdi.cdi_get_smart_raw_value(ptr, index, attr);
+}
+
+DWORD WINAPI cdi_get_disk_vendor_id(CDI_SMART* ptr, INT index)
+{
+	if (m_cdi.cdi_get_disk_vendor_id == NULL)
+		return 0;
+	return m_cdi.cdi_get_disk_vendor_id(ptr, index);
+}
+
+BOOL WINAPI cdi_get_is_nvme(CDI_SMART* ptr, INT index)
+{
+	if (m_cdi.cdi_get_is_nvme == NULL)
+		return FALSE;
+	return m_cdi.cdi_get_is_nvme(ptr, index);
 }

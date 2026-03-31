@@ -1,4 +1,4 @@
-ï»¿/*
+/*
 # Nuklear
 ![](https://cloud.githubusercontent.com/assets/8057201/11761525/ae06f0ca-a0c6-11e5-819d-5610b25f6ef4.gif)
 
@@ -3239,6 +3239,10 @@ NK_API nk_bool nk_tree_push_hashed(struct nk_context*, enum nk_tree_type, const 
  * \returns `true(1)` if visible and fillable with widgets or `false(0)` otherwise
  */
 NK_API nk_bool nk_tree_image_push_hashed(struct nk_context*, enum nk_tree_type, struct nk_image, const char *title, enum nk_collapse_states initial_state, const char *hash, int len,int seed);
+
+NK_API nk_bool nk_tree_image_push_hashed_color(struct nk_context*, enum nk_tree_type, struct nk_image, const char *title, enum nk_collapse_states initial_state, const char *hash, int len, int seed, struct nk_color text_color);
+
+NK_API nk_bool nk_tree_image_push_id_color(struct nk_context*, enum nk_tree_type, struct nk_image, const char *title, enum nk_collapse_states initial_state, int id, struct nk_color text_color);
 
 /**
  * # # nk_tree_pop
@@ -22954,6 +22958,115 @@ nk_tree_state_base(struct nk_context *ctx, enum nk_tree_type type,
     } else return nk_false;
 }
 NK_INTERN int
+nk_tree_state_base_color(struct nk_context *ctx, enum nk_tree_type type,
+    struct nk_image *img, const char *title, enum nk_collapse_states *state, struct nk_color text_color)
+{
+    struct nk_window *win;
+    struct nk_panel *layout;
+    const struct nk_style *style;
+    struct nk_command_buffer *out;
+    const struct nk_input *in;
+    const struct nk_style_button *button;
+    enum nk_symbol_type symbol;
+    float row_height;
+
+    struct nk_vec2 item_spacing;
+    struct nk_rect header = {0,0,0,0};
+    struct nk_rect sym = {0,0,0,0};
+    struct nk_text text;
+
+    nk_flags ws = 0;
+    enum nk_widget_layout_states widget_state;
+
+    NK_ASSERT(ctx);
+    NK_ASSERT(ctx->current);
+    NK_ASSERT(ctx->current->layout);
+    if (!ctx || !ctx->current || !ctx->current->layout)
+        return 0;
+
+    win = ctx->current;
+    layout = win->layout;
+    out = &win->buffer;
+    style = &ctx->style;
+    item_spacing = style->window.spacing;
+
+    row_height = style->font->height + 2 * style->tab.padding.y;
+    nk_layout_set_min_row_height(ctx, row_height);
+    nk_layout_row_dynamic(ctx, row_height, 1);
+    nk_layout_reset_min_row_height(ctx);
+
+    widget_state = nk_widget(&header, ctx);
+    if (type == NK_TREE_TAB) {
+        const struct nk_style_item *background = &style->tab.background;
+
+        switch(background->type) {
+            case NK_STYLE_ITEM_IMAGE:
+                nk_draw_image(out, header, &background->data.image, nk_rgb_factor(nk_white, style->tab.color_factor));
+                break;
+            case NK_STYLE_ITEM_NINE_SLICE:
+                nk_draw_nine_slice(out, header, &background->data.slice, nk_rgb_factor(nk_white, style->tab.color_factor));
+                break;
+            case NK_STYLE_ITEM_COLOR:
+                nk_fill_rect(out, header, 0, nk_rgb_factor(style->tab.border_color, style->tab.color_factor));
+                nk_fill_rect(out, nk_shrink_rect(header, style->tab.border),
+                    style->tab.rounding, nk_rgb_factor(background->data.color, style->tab.color_factor));
+                break;
+        }
+    } else text.background = style->window.background;
+
+    in = (!(layout->flags & NK_WINDOW_ROM)) ? &ctx->input: 0;
+    in = (in && widget_state == NK_WIDGET_VALID) ? &ctx->input : 0;
+    if (nk_button_behavior(&ws, header, in, NK_BUTTON_DEFAULT))
+        *state = (*state == NK_MAXIMIZED) ? NK_MINIMIZED : NK_MAXIMIZED;
+
+    if (*state == NK_MAXIMIZED) {
+        symbol = style->tab.sym_maximize;
+        if (type == NK_TREE_TAB)
+            button = &style->tab.tab_maximize_button;
+        else button = &style->tab.node_maximize_button;
+    } else {
+        symbol = style->tab.sym_minimize;
+        if (type == NK_TREE_TAB)
+            button = &style->tab.tab_minimize_button;
+        else button = &style->tab.node_minimize_button;
+    }
+
+    {
+        sym.w = sym.h = style->font->height;
+        sym.y = header.y + style->tab.padding.y;
+        sym.x = header.x + style->tab.padding.x;
+        nk_do_button_symbol(&ws, &win->buffer, sym, symbol, NK_BUTTON_DEFAULT,
+            button, 0, style->font);
+
+        if (img) {
+            sym.x = sym.x + sym.w + 4 * item_spacing.x;
+            nk_draw_image(&win->buffer, sym, img, nk_white);
+            sym.w = style->font->height + style->tab.spacing.x;
+        }
+    }
+
+    {
+        struct nk_rect label;
+        header.w = NK_MAX(header.w, sym.w + item_spacing.x);
+        label.x = sym.x + sym.w + item_spacing.x;
+        label.y = sym.y;
+        label.w = header.w - (sym.w + item_spacing.y + style->tab.indent);
+        label.h = style->font->height;
+        text.text = text_color;
+        text.padding = nk_vec2(0,0);
+        nk_widget_text(out, label, title, nk_strlen(title), &text,
+            NK_TEXT_LEFT, style->font);
+    }
+
+    if (*state == NK_MAXIMIZED) {
+        layout->at_x = header.x + (float)*layout->offset_x + style->tab.indent;
+        layout->bounds.w = NK_MAX(layout->bounds.w, style->tab.indent);
+        layout->bounds.w -= (style->tab.indent + style->window.padding.x);
+        layout->row.tree_depth++;
+        return nk_true;
+    } else return nk_false;
+}
+NK_INTERN int
 nk_tree_base(struct nk_context *ctx, enum nk_tree_type type,
     struct nk_image *img, const char *title, enum nk_collapse_states initial_state,
     const char *hash, int len, int line)
@@ -22963,7 +23076,6 @@ nk_tree_base(struct nk_context *ctx, enum nk_tree_type type,
     nk_hash tree_hash = 0;
     nk_uint *state = 0;
 
-    /* retrieve tree state from internal widget state tables */
     if (!hash) {
         title_len = (int)nk_strlen(title);
         tree_hash = nk_murmur_hash(title, (int)title_len, (nk_hash)line);
@@ -22974,6 +23086,27 @@ nk_tree_base(struct nk_context *ctx, enum nk_tree_type type,
         *state = initial_state;
     }
     return nk_tree_state_base(ctx, type, img, title, (enum nk_collapse_states*)state);
+}
+NK_INTERN int
+nk_tree_base_color(struct nk_context *ctx, enum nk_tree_type type,
+    struct nk_image *img, const char *title, enum nk_collapse_states initial_state,
+    const char *hash, int len, int line, struct nk_color text_color)
+{
+    struct nk_window *win = ctx->current;
+    int title_len = 0;
+    nk_hash tree_hash = 0;
+    nk_uint *state = 0;
+
+    if (!hash) {
+        title_len = (int)nk_strlen(title);
+        tree_hash = nk_murmur_hash(title, (int)title_len, (nk_hash)line);
+    } else tree_hash = nk_murmur_hash(hash, len, (nk_hash)line);
+    state = nk_find_value(win, tree_hash);
+    if (!state) {
+        state = nk_add_value(ctx, win, tree_hash, 0);
+        *state = initial_state;
+    }
+    return nk_tree_state_base_color(ctx, type, img, title, (enum nk_collapse_states*)state, text_color);
 }
 NK_API nk_bool
 nk_tree_state_push(struct nk_context *ctx, enum nk_tree_type type,
@@ -23019,6 +23152,20 @@ nk_tree_image_push_hashed(struct nk_context *ctx, enum nk_tree_type type,
     const char *hash, int len,int seed)
 {
     return nk_tree_base(ctx, type, &img, title, initial_state, hash, len, seed);
+}
+NK_API nk_bool
+nk_tree_image_push_hashed_color(struct nk_context *ctx, enum nk_tree_type type,
+    struct nk_image img, const char *title, enum nk_collapse_states initial_state,
+    const char *hash, int len, int seed, struct nk_color text_color)
+{
+    return nk_tree_base_color(ctx, type, &img, title, initial_state, hash, len, seed, text_color);
+}
+NK_API nk_bool
+nk_tree_image_push_id_color(struct nk_context *ctx, enum nk_tree_type type,
+    struct nk_image img, const char *title, enum nk_collapse_states initial_state,
+    int id, struct nk_color text_color)
+{
+    return nk_tree_image_push_hashed_color(ctx, type, img, title, initial_state, NK_FILE_LINE, nk_strlen(NK_FILE_LINE), id, text_color);
 }
 NK_API void
 nk_tree_pop(struct nk_context *ctx)
@@ -30930,7 +31077,7 @@ nk_tooltipfv(struct nk_context *ctx, const char *fmt, va_list args)
 /// - 2025/04/06 (4.12.7) - Fix text input navigation and mouse scrolling
 /// - 2025/03/29 (4.12.6) - Fix unitialized data in nk_input_char
 /// - 2025/03/05 (4.12.5) - Fix scrolling knob also scrolling parent window, remove dead code
-/// - 2024/12/11 (4.12.4) - Fix array subscript [0, 0] is outside array bounds of â€˜char[1]â€™
+/// - 2024/12/11 (4.12.4) - Fix array subscript [0, 0] is outside array bounds of ¡®char[1]¡¯
 /// - 2024/12/11 (4.12.3) - Fix border color for property widgets
 /// - 2024/11/20 (4.12.2) - Fix int/float type conversion warnings in `nk_roundf`
 /// - 2024/03/07 (4.12.1) - Fix bitwise operations warnings in C++20
