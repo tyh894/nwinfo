@@ -1812,6 +1812,28 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 				nk_lhc(ctx, u8"描述:", NK_TEXT_LEFT, g_color_text_d);
 				nk_lhc(ctx, gnwinfo_bsod_get_code_desc(record->bugcheck_id), NK_TEXT_LEFT, g_color_text_l);
 				
+				if (record->caused_by_driver[0] != '\0' && record->process_name[0] != '\0') {
+					nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.2f, 0.8f });
+					nk_lhc(ctx, u8"原因分析:", NK_TEXT_LEFT, g_color_text_d);
+					char analysis[256];
+					_snprintf_s(analysis, sizeof(analysis), _TRUNCATE, 
+						u8"%s驱动存在缺陷，%s运行并进行某些特定操作时导致系统崩溃", 
+						record->caused_by_driver, record->process_name);
+					nk_lhc(ctx, analysis, NK_TEXT_LEFT, g_color_warning);
+				} else {
+					if (record->process_name[0] != '\0') {
+						nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.2f, 0.8f });
+						nk_lhc(ctx, u8"崩溃时正在运行的程序:", NK_TEXT_LEFT, g_color_text_d);
+						nk_lhc(ctx, record->process_name, NK_TEXT_LEFT, g_color_text_l);
+					}
+					
+					if (record->caused_by_driver[0] != '\0') {
+						nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.2f, 0.8f });
+						nk_lhc(ctx, u8"导致问题的驱动模块:", NK_TEXT_LEFT, g_color_text_d);
+						nk_lhc(ctx, record->caused_by_driver, NK_TEXT_LEFT, g_color_warning);
+					}
+				}
+				
 				if (record->dump_file[0] != '\0') {
 					nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.2f, 0.8f });
 					nk_lhc(ctx, u8"转储文件:", NK_TEXT_LEFT, g_color_text_d);

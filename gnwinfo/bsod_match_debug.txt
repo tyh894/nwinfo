@@ -1,0 +1,18 @@
+Found 2 BSOD records from event log
+  [0] dump_file=''
+  [1] dump_file=''
+
+Checking minidump: 032726-9859-01.dmp
+  Compare with record[0]: '' vs '032726-9859-01.dmp'
+  Compare with record[1]: '' vs '032726-9859-01.dmp'
+  No match, creating new record
+
+=== Final Results ===
+Record[0]:
+  bugcheck_id=0x1A
+  caused_by_driver=''
+  process_name=''
+Record[1]:
+  bugcheck_id=0xEF
+  caused_by_driver=''
+  process_name=''

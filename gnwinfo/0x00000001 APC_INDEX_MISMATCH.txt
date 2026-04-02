@@ -1,0 +1,210 @@
+************* Path validation summary **************
+Response                         Time (ms)     Location
+Deferred                                       srv*
+
+************* Preparing the environment for Debugger Extensions Gallery repositories **************
+   ExtensionRepository : Implicit
+   UseExperimentalFeatureForNugetShare : true
+   AllowNugetExeUpdate : true
+   NonInteractiveNuget : true
+   AllowNugetMSCredentialProviderInstall : true
+   AllowParallelInitializationOfLocalRepositories : true
+   EnableRedirectToChakraJsProvider : false
+
+   -- Configuring repositories
+      ----> Repository : LocalInstalled, Enabled: true
+      ----> Repository : UserExtensions, Enabled: true
+
+>>>>>>>>>>>>> Preparing the environment for Debugger Extensions Gallery repositories completed, duration 0.015 seconds
+
+************* Waiting for Debugger Extensions Gallery to Initialize **************
+
+>>>>>>>>>>>>> Waiting for Debugger Extensions Gallery to Initialize completed, duration 0.047 seconds
+   ----> Repository : UserExtensions, Enabled: true, Packages count: 0
+   ----> Repository : LocalInstalled, Enabled: true, Packages count: 46
+
+Microsoft (R) Windows Debugger Version 10.0.29547.1002 AMD64
+Copyright (c) Microsoft Corporation. All rights reserved.
+
+
+Loading Dump File [D:\Download\BSODAnalyzer-master\BSODAnalyzer-master\032726-9859-01.dmp]
+Mini Kernel Dump File: Only registers and stack trace are available
+
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+Deferred                                       srv*
+Symbol search path is: srv*
+Executable search path is: 
+Windows 10 Kernel Version 19041 MP (6 procs) Free x64
+Product: WinNt, suite: TerminalServer SingleUserTS
+Edition build lab: 19041.1.amd64fre.vb_release.191206-1406
+Kernel base = 0xfffff805`33400000 PsLoadedModuleList = 0xfffff805`3402a420
+Debug session time: Fri Mar 27 10:19:33.589 2026 (UTC + 8:00)
+System Uptime: 0 days 1:05:16.089
+Loading Kernel Symbols
+...............................................................
+................................................................
+................................................................
+............................
+Loading User Symbols
+Unable to read KTHREAD address ffffb98aec8ce138
+Unable to read KTHREAD address ffffb98aec8ce138
+PEB is paged out (Peb.Ldr = 00000018`a7bed018).  Type ".hh dbgerr001" for details
+Loading unloaded module list
+...........
+Unable to read KTHREAD address ffffb98aec8ce138
+Unable to read KTHREAD address ffffb98aec8ce138
+For analysis of this file, run !analyze -v
+nt!KeBugCheckEx:
+fffff805`337fd5c0 48894c2408      mov     qword ptr [rsp+8],rcx ss:0018:ffff8986`14498fb0=000000000000001a
+2: kd> !analyze -v
+Loading Kernel Symbols
+...............................................................
+................................................................
+................................................................
+............................
+Loading User Symbols
+PEB is paged out (Peb.Ldr = 00000018`a7bed018).  Type ".hh dbgerr001" for details
+Loading unloaded module list
+...........
+*******************************************************************************
+*                                                                             *
+*                        Bugcheck Analysis                                    *
+*                                                                             *
+*******************************************************************************
+
+MEMORY_MANAGEMENT (1a)
+    # Any other values for parameter 1 must be individually examined.
+Arguments:
+Arg1: 0000000000061941, The subtype of the BugCheck.
+Arg2: ffffa80032e5b270
+Arg3: 0000000000000009
+Arg4: ffff898614499150
+
+Debugging Details:
+------------------
+
+*** WARNING: Unable to verify timestamp for QQSysMonX64_EV.sys
+
+KEY_VALUES_STRING: 1
+
+    Key  : Analysis.CPU.mSec
+    Value: 1437
+
+    Key  : Analysis.Elapsed.mSec
+    Value: 3051
+
+    Key  : Analysis.IO.Other.Mb
+    Value: 0
+
+    Key  : Analysis.IO.Read.Mb
+    Value: 1
+
+    Key  : Analysis.IO.Write.Mb
+    Value: 0
+
+    Key  : Analysis.Init.CPU.mSec
+    Value: 703
+
+    Key  : Analysis.Init.Elapsed.mSec
+    Value: 18812
+
+    Key  : Analysis.Memory.CommitPeak.Mb
+    Value: 74
+
+    Key  : Analysis.Version.DbgEng
+    Value: 10.0.29547.1002
+
+    Key  : Analysis.Version.Description
+    Value: 10.2602.27.2 amd64fre
+
+    Key  : Analysis.Version.Ext
+    Value: 1.2602.27.2
+
+    Key  : Bugcheck.Code.LegacyAPI
+    Value: 0x1a
+
+    Key  : Bugcheck.Code.TargetModel
+    Value: 0x1a
+
+    Key  : Failure.Bucket
+    Value: 0x1a_61941_PAGE_TABLE_RESERVED_BITS_SET_IMAGE_hardware_ram
+
+    Key  : Failure.Hash
+    Value: {c6e5c6cf-692e-7852-5dc5-b74944540fc0}
+
+    Key  : WER.OS.Branch
+    Value: vb_release
+
+    Key  : WER.OS.Version
+    Value: 10.0.19041.1
+
+    Key  : WER.System.BIOSRevision
+    Value: 1.43.0.0
+
+
+BUGCHECK_CODE:  1a
+
+BUGCHECK_P1: 61941
+
+BUGCHECK_P2: ffffa80032e5b270
+
+BUGCHECK_P3: 9
+
+BUGCHECK_P4: ffff898614499150
+
+FILE_IN_CAB:  032726-9859-01.dmp
+
+FAULTING_THREAD:  ffffb98aed2f3080
+
+BLACKBOXBSD: 1 (!blackboxbsd)
+
+
+BLACKBOXNTFS: 1 (!blackboxntfs)
+
+
+BLACKBOXPNP: 1 (!blackboxpnp)
+
+
+BLACKBOXWINLOGON: 1 (!blackboxwinlogon) (!blackboxwinlogonnotify)
+
+
+CUSTOMER_CRASH_COUNT:  1
+
+PROCESS_NAME:  devenv.exe
+
+STACK_TEXT:  
+ffff8986`14498fa8 fffff805`33821bdc     : 00000000`0000001a 00000000`00061941 ffffa800`32e5b270 00000000`00000009 : nt!KeBugCheckEx
+ffff8986`14498fb0 fffff805`3380d66d     : 00007ffb`00000627 00000000`00000000 ffff8986`144993d0 ffff86bf`fd9a6a18 : nt!MmAccessFault+0x214b8c
+ffff8986`14499150 fffff805`336bcc3e     : ffffb98a`dae00340 ffffb98a`dae01340 ffffb98a`dae04b80 00000000`00000100 : nt!KiPageFault+0x36d
+ffff8986`144992e0 fffff805`336bc86f     : ffff9304`00000002 ffffb98a`f23e9150 ffffb98a`706c7472 fffff805`00000001 : nt!ExAllocateHeapPool+0x39e
+ffff8986`14499420 fffff805`33db418e     : 00000000`000000e0 00000000`00000001 00000000`000000e8 ffff9304`00000000 : nt!ExpAllocatePoolWithTagFromNode+0x5f
+ffff8986`14499470 fffff805`56cd6e46     : ffffb98a`e52133c0 00000000`00000001 ffffb98a`00000000 ffff8986`14499590 : nt!ExAllocatePoolWithTag+0x2e
+ffff8986`144994b0 ffffb98a`e52133c0     : 00000000`00000001 ffffb98a`00000000 ffff8986`14499590 00000000`00000000 : QQSysMonX64_EV+0x16e46
+ffff8986`144994b8 00000000`00000001     : ffffb98a`00000000 ffff8986`14499590 00000000`00000000 fffff805`56cc3a49 : 0xffffb98a`e52133c0
+ffff8986`144994c0 ffffb98a`00000000     : ffff8986`14499590 00000000`00000000 fffff805`56cc3a49 00000009`1e4ef13c : 0x1
+ffff8986`144994c8 ffff8986`14499590     : 00000000`00000000 fffff805`56cc3a49 00000009`1e4ef13c 00000000`00000005 : 0xffffb98a`00000000
+ffff8986`144994d0 00000000`00000000     : fffff805`56cc3a49 00000009`1e4ef13c 00000000`00000005 00000000`00000001 : 0xffff8986`14499590
+
+
+MODULE_NAME: hardware
+
+IMAGE_NAME:  hardware_ram
+
+STACK_COMMAND: .process /r /p 0xffffb98aee6d9300; .thread /r /p 0xffffb98aed2f3080 ; kb
+
+FAILURE_BUCKET_ID:  0x1a_61941_PAGE_TABLE_RESERVED_BITS_SET_IMAGE_hardware_ram
+
+OS_VERSION:  10.0.19041.1
+
+BUILDLAB_STR:  vb_release
+
+OSPLATFORM_TYPE:  x64
+
+OSNAME:  Windows 10
+
+FAILURE_ID_HASH:  {c6e5c6cf-692e-7852-5dc5-b74944540fc0}
+
+Followup:     MachineOwner
+---------

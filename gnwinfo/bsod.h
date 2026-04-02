@@ -34,6 +34,7 @@ typedef struct _BSOD_RECORD {
     UINT64 param3;
     UINT64 param4;
     char dump_file[BSOD_MAX_PATH];
+    char process_name[64];
     char caused_by_driver[64];
     BSOD_MODULE modules[BSOD_MAX_MODULES];
     int module_count;
@@ -52,3 +53,8 @@ void gnwinfo_bsod_parse_minidump(const char* dump_path, BSOD_RECORD* record);
 
 const char* gnwinfo_bsod_get_code_name(UINT32 code);
 const char* gnwinfo_bsod_get_code_desc(UINT32 code);
+
+int gnwinfo_bsod_get_dump_enabled(void);
+int gnwinfo_bsod_set_dump_enabled(int enable);
+int gnwinfo_bsod_get_dump_type(void);
+int gnwinfo_bsod_set_dump_type(int type);
