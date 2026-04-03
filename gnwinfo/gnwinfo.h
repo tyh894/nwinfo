@@ -181,6 +181,7 @@ extern WCHAR g_ini_path[MAX_PATH];
 extern unsigned int g_init_width;
 extern unsigned int g_init_height;
 extern unsigned int g_init_alpha;
+extern unsigned int g_smart_interval;
 extern GdipFont* g_font;
 extern int g_font_size;
 extern double g_dpi_factor;

@@ -111,6 +111,7 @@ lang_zh_cn[N__MAX_] =
 	[N__SHOW_SENSITIVE_DATA] = u8"显示敏感数据",
 	[N__DISABLE_DPI_SCALING] = u8"禁用 DPI 缩放",
 	[N__DISABLE_ANTIALIASING] = u8"禁用抗锯齿",
+	[N__SMART_INTERVAL] = u8"#SMART 间隔 (秒)", // do not delete the '#' character
 	[N__AUTOSTART] = u8"开机自启动",
 	[N__WIDTH] = u8"#宽度",
 	[N__HEIGHT] = u8"#高度",

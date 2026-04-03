@@ -705,7 +705,7 @@ gnwinfo_ctx_init(HINSTANCE inst, HWND wnd, struct nk_context* ctx, float width, 
 	// printf("DEBUG: Setting timers\n");
 	SetTimer(g_ctx.wnd, IDT_TIMER_1S, 1000, (TIMERPROC)NULL);
 	SetTimer(g_ctx.wnd, IDT_TIMER_1M, 60 * 1000, (TIMERPROC)NULL);
-	SetTimer(g_ctx.wnd, IDT_TIMER_SMART_HISTORY, 30 * 1000, (TIMERPROC)NULL);
+	SetTimer(g_ctx.wnd, IDT_TIMER_SMART_HISTORY, g_smart_interval * 1000, (TIMERPROC)NULL);
 	// printf("DEBUG: Timers set, init done\n");
 
 	if (g_need_save_hw_config)

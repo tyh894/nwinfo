@@ -113,6 +113,7 @@ lang_en_us[N__MAX_] =
 	[N__SHOW_SENSITIVE_DATA] = u8"Show sensitive data",
 	[N__DISABLE_DPI_SCALING] = u8"Disable DPI scaling",
 	[N__DISABLE_ANTIALIASING] = u8"Disable anti-aliasing",
+	[N__SMART_INTERVAL] = u8"#SMART Interval (sec)", // do not delete the '#' character
 	[N__WIDTH] = u8"#Width", // do not delete the '#' character
 	[N__HEIGHT] = u8"#Height", // do not delete the '#' character
 	[N__ALPHA] = u8"#Alpha", // do not delete the '#' character

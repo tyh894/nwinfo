@@ -234,6 +234,8 @@ gnwinfo_draw_settings_window(struct nk_context* ctx, float width, float height)
 	nk_spacer(ctx);
 	nk_checkbox_label(ctx, N_(N__AUTOSTART), &g_autostart);
 	nk_spacer(ctx);
+	nk_property_int(ctx, N_(N__SMART_INTERVAL), 60, (int*)&g_smart_interval, 86400, 10, 60);
+	nk_spacer(ctx);
 	nk_property_int(ctx, N_(N__WIDTH), 60, &g_init_width, 1920, 10, 10);
 	nk_spacer(ctx);
 	nk_property_int(ctx, N_(N__HEIGHT), 80, &g_init_height, 1080, 10, 10);
@@ -275,6 +277,7 @@ gnwinfo_draw_settings_window(struct nk_context* ctx, float width, float height)
 		gnwinfo_set_ini_value(L"Window", L"Width", L"%u", g_init_width);
 		gnwinfo_set_ini_value(L"Window", L"Height", L"%u", g_init_height);
 		gnwinfo_set_ini_value(L"Window", L"Alpha", L"%u", g_init_alpha);
+		gnwinfo_set_ini_value(L"Window", L"SmartInterval", L"%u", g_smart_interval);
 		gnwinfo_set_ini_value(L"Window", L"BGInfo", L"%d", !g_ctx.gui_bginfo);
 		gnwinfo_set_ini_value(L"Window", L"HideSensitive", L"%u", g_ctx.lib.HideSensitive);
 		gnwinfo_set_ini_value(L"Window", L"DpiScaling", L"%d", g_dpi_scaling);

@@ -7,6 +7,106 @@
 #include "utils.h"
 
 static CHAR m_buf[MAX_PATH];
+static int g_group_index = 0;
+
+static struct nk_color g_color_separator = { 0xC0, 0xC0, 0xC0, 0xFF };
+
+static void
+draw_group_separator(struct nk_context* ctx)
+{
+	struct nk_window* win = ctx->current;
+	if (!win) return;
+	
+	nk_layout_row(ctx, NK_DYNAMIC, 4, 1, (float[1]) { 1.0f });
+	struct nk_rect bounds;
+	if (!nk_widget(&bounds, ctx)) return;
+	
+	float y = bounds.y + bounds.h / 2;
+	nk_stroke_line(&win->buffer, bounds.x, y, bounds.x + bounds.w, y, 1, g_color_separator);
+}
+
+static void
+draw_group_background(struct nk_context* ctx, int group_idx)
+{
+	g_group_index = group_idx;
+}
+
+static const char* translate_smart_header(const char* cell)
+{
+	if (strcmp(cell, "Time") == 0) return u8"时间";
+	
+	if (strlen(cell) >= 2) {
+		unsigned int id;
+		if (sscanf_s(cell, "%02u", &id) == 1) {
+			switch ((BYTE)id) {
+				case 0x01: return u8"01 关键警告";
+				case 0x02: return u8"02 温度";
+				case 0x03: return u8"03 可用备用空间";
+				case 0x04: return u8"04 可用备用空间阈值";
+				case 0x05: return u8"05 使用百分比";
+				case 0x06: return u8"06 读取错误率";
+				case 0x07: return u8"07 写入错误率";
+				case 0x08: return u8"08 读取重试次数";
+				case 0x09: return u8"09 写入重试次数";
+				case 0x0A: return u8"10 旋转重试计数";
+				case 0x0B: return u8"11 重新校准重试计数";
+				case 0x0C: return u8"12 通电周期计数";
+				case 0x0D: return u8"13 不安全关机次数";
+				case 0x0E: return u8"14 介质错误";
+				case 0x0F: return u8"15 错误数量";
+				case 0x10: return u8"16 数据完整性错误";
+				case 0xAA: return u8"170 可用预留空间";
+				case 0xAB: return u8"171 程序失败计数";
+				case 0xAC: return u8"172 擦除失败计数";
+				case 0xAD: return u8"173 平均擦除次数";
+				case 0xAE: return u8"174 意外断电计数";
+				case 0xAF: return u8"175 断电保护计数";
+				case 0xB0: return u8"176 擦除错误计数";
+				case 0xB1: return u8"177 磨损均衡计数";
+				case 0xB2: return u8"178 充电计时器";
+				case 0xB3: return u8"179 充电状态";
+				case 0xB4: return u8"180 保留块数";
+				case 0xB5: return u8"181 程序失败计数";
+				case 0xB6: return u8"182 擦除失败计数";
+				case 0xB7: return u8"183 SATA降级计数";
+				case 0xB8: return u8"184 端对端错误";
+				case 0xB9: return u8"185 校准重试计数";
+				case 0xBA: return u8"186 磁头飞行时间";
+				case 0xBB: return u8"187 不可纠正错误";
+				case 0xBC: return u8"188 命令超时";
+				case 0xBD: return u8"189 高优先级写入";
+				case 0xBE: return u8"190 温度";
+				case 0xBF: return u8"191 重力感应错误";
+				case 0xC0: return u8"192 断电保护计数";
+				case 0xC1: return u8"193 磁头加载周期";
+				case 0xC2: return u8"194 温度";
+				case 0xC3: return u8"195 ECC校验错误";
+				case 0xC4: return u8"196 重新映射扇区计数";
+				case 0xC5: return u8"197 待映射扇区计数";
+				case 0xC6: return u8"198 脱机无法校正扇区";
+				case 0xC7: return u8"199 CRC错误计数";
+				case 0xC8: return u8"200 写入错误计数";
+				case 0xC9: return u8"201 软读取错误率";
+				case 0xCA: return u8"202 数据地址标记错误";
+				case 0xCB: return u8"203 运行错误校准";
+				case 0xCC: return u8"204 软读取错误率";
+				case 0xCD: return u8"205 报告不可纠正错误";
+				case 0xCE: return u8"206 温度";
+				case 0xCF: return u8"207 传输错误率";
+				case 0xE1: return u8"225 总写入量";
+				case 0xE2: return u8"226 总读取量";
+				case 0xE7: return u8"231 温度/寿命";
+				case 0xE8: return u8"232 端对端错误";
+				case 0xE9: return u8"233 NAND写入量";
+				case 0xEA: return u8"234 NAND读取量";
+				case 0xF0: return u8"240 磁头飞行时间";
+				case 0xF1: return u8"241 总写入量";
+				case 0xF2: return u8"242 总读取量";
+			}
+		}
+	}
+	return cell;
+}
 
 static inline nk_bool
 quick_access_button(struct nk_context* ctx, struct nk_image img, const char* str)
@@ -25,7 +125,7 @@ draw_os(struct nk_context* ctx)
 	LPCSTR saved_edition = gnwinfo_hw_compare_get_string("System", "Edition");
 	LPCSTR saved_build = gnwinfo_hw_compare_get_string("System", "Build Number");
 	
-	nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2, g_ctx.gui_ratio });
+	nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.2f, (1.0f-0.2f-g_ctx.gui_ratio)/2, (1.0f-0.2f-g_ctx.gui_ratio)/2, g_ctx.gui_ratio });
 	nk_image_label(ctx, GET_PNG(IDR_PNG_OS), N_(N__OS), NK_TEXT_LEFT, g_color_text_d);
 	
 	int len = snprintf(m_buf, MAX_PATH, "%s %s",
@@ -76,7 +176,7 @@ draw_os(struct nk_context* ctx)
 
 	if (g_ctx.main_flag & MAIN_OS_DETAIL)
 	{
-		nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2, g_ctx.gui_ratio });
+		nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.2f, (1.0f-0.2f-g_ctx.gui_ratio)/2, (1.0f-0.2f-g_ctx.gui_ratio)/2, g_ctx.gui_ratio });
 		nk_lhsc(ctx, N_(N__LOGIN), NK_TEXT_LEFT, g_color_text_d, nk_false, nk_true);
 		
 		LPCSTR saved_username = gnwinfo_hw_compare_get_string("System", "Username");
@@ -132,7 +232,7 @@ draw_os(struct nk_context* ctx)
 
 	if (g_ctx.main_flag & MAIN_OS_UPTIME)
 	{
-		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
+		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, (1.0f-0.2f-g_ctx.gui_ratio)/2, (1.0f-0.2f-g_ctx.gui_ratio)/2 });
 		nk_lhsc(ctx, N_(N__UPTIME), NK_TEXT_LEFT, g_color_text_d, nk_false, nk_true);
 		nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
 		nk_lhc(ctx, g_ctx.sys_uptime, NK_TEXT_LEFT, g_color_text_l);
@@ -144,7 +244,7 @@ draw_os(struct nk_context* ctx)
 		LPCSTR activation_method = NWL_NodeAttrGet(g_ctx.system, "Activation Method");
 		if (activation_status && activation_status[0] != '\0' && activation_status[0] != '-')
 		{
-			nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
+			nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, (1.0f-0.2f-g_ctx.gui_ratio)/2, (1.0f-0.2f-g_ctx.gui_ratio)/2 });
 			nk_lhsc(ctx, u8"激活状态", NK_TEXT_LEFT, g_color_text_d, nk_false, nk_true);
 			
 			LPCSTR saved_status = gnwinfo_hw_compare_get_string("System", "Activation Status");
@@ -164,7 +264,7 @@ draw_os(struct nk_context* ctx)
 
 			if (activation_method && activation_method[0] != '\0' && activation_method[0] != '-')
 			{
-				nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
+				nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, (1.0f-0.2f-g_ctx.gui_ratio)/2, (1.0f-0.2f-g_ctx.gui_ratio)/2 });
 				nk_lhsc(ctx, u8"激活方式", NK_TEXT_LEFT, g_color_text_d, nk_false, nk_true);
 				
 				LPCSTR saved_method = gnwinfo_hw_compare_get_string("System", "Activation Method");
@@ -214,7 +314,7 @@ draw_bios(struct nk_context* ctx)
 	LPCSTR tpm = g_ctx.system ? NWL_NodeAttrGet(g_ctx.system, "TPM") : "-";
 	LPCSTR sb = g_ctx.uefi ? NWL_NodeAttrGet(g_ctx.uefi, "Secure Boot") : "-";
 
-	nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2, g_ctx.gui_ratio });
+	nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.2f, (1.0f-0.2f-g_ctx.gui_ratio)/2, (1.0f-0.2f-g_ctx.gui_ratio)/2, g_ctx.gui_ratio });
 	nk_image_label(ctx, GET_PNG(IDR_PNG_FIRMWARE), N_(N__BIOS), NK_TEXT_LEFT, g_color_text_d);
 
 	int len = snprintf(m_buf, MAX_PATH, "%s", g_ctx.system ? NWL_NodeAttrGet(g_ctx.system, "Firmware") : "Unknown");
@@ -258,7 +358,7 @@ draw_bios(struct nk_context* ctx)
 
 	if (g_ctx.main_flag & MAIN_B_VENDOR)
 	{
-		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
+		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, (1.0f-0.2f-g_ctx.gui_ratio)/2, (1.0f-0.2f-g_ctx.gui_ratio)/2 });
 		nk_lhsc(ctx, N_(N__VENDOR), NK_TEXT_LEFT, g_color_text_d, nk_false, nk_true);
 		
 		LPCSTR current_vendor = gnwinfo_get_smbios_attr("0", "Vendor", NULL, NULL);
@@ -361,7 +461,7 @@ draw_computer(struct nk_context* ctx)
 
 	if (g_ctx.board)
 	{
-		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
+		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, (1.0f-0.2f-g_ctx.gui_ratio)/2, (1.0f-0.2f-g_ctx.gui_ratio)/2 });
 		nk_lhsc(ctx, NWL_NodeAttrGet(g_ctx.board, "Manufacturer"), NK_TEXT_LEFT, g_color_text_d, nk_true, nk_true);
 
 		char current_board[MAX_PATH] = {0};
@@ -508,7 +608,7 @@ draw_processor(struct nk_context* ctx)
 
 		if (!(g_ctx.main_flag & MAIN_CPU_CACHE))
 			continue;
-		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
+		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, (1.0f-0.2f-g_ctx.gui_ratio)/2, (1.0f-0.2f-g_ctx.gui_ratio)/2 });
 		nk_spacer(ctx);
 
 		PNODE cache = NWL_NodeGetChild(cpu, "Cache");
@@ -784,7 +884,7 @@ draw_mem_spd(struct nk_context* ctx)
 			NWL_NodeAttrGet(tab, "Capacity"),
 			NWL_NodeAttrGet(tab, "Manufacturer"),
 			NWL_NodeAttrGet(tab, "Serial Number"));
-		nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2, g_ctx.gui_ratio });
+		nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.2f, (1.0f-0.2f-g_ctx.gui_ratio)/2, (1.0f-0.2f-g_ctx.gui_ratio)/2, g_ctx.gui_ratio });
 		nk_spacer(ctx);
 		nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_text_d);
 		nk_lhcf(ctx, NK_TEXT_LEFT, g_color_text_l,
@@ -831,7 +931,7 @@ draw_display(struct nk_context* ctx)
 {
 	INT i;
 
-	nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2, g_ctx.gui_ratio });
+	nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.2f, (1.0f-0.2f-g_ctx.gui_ratio)/2, (1.0f-0.2f-g_ctx.gui_ratio)/2, g_ctx.gui_ratio });
 	nk_image_label(ctx, GET_PNG(IDR_PNG_DISPLAY), N_(N__DISPLAY), NK_TEXT_LEFT, g_color_text_d);
 
 	LPCSTR saved_res = gnwinfo_hw_compare_get_string("DisplaySettings", "Resolution");
@@ -910,7 +1010,7 @@ draw_display(struct nk_context* ctx)
 				nk_lhcf(ctx, NK_TEXT_LEFT, g_color_text_l, "%s (%u%%)",
 					NWL_GetHumanSize(gpu->TotalMemory, NWLC->NwUnits, 1024), (unsigned)gpu->MemoryPercent);
 
-				nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
+				nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, (1.0f-0.2f-g_ctx.gui_ratio)/2, (1.0f-0.2f-g_ctx.gui_ratio)/2 });
 				nk_spacer(ctx);
 				nk_lhcf(ctx, NK_TEXT_LEFT, g_color_text_l,
 					u8"%.1f%% %.1fW %.1fMHz %.1fV %lluRPM",
@@ -926,7 +1026,7 @@ draw_display(struct nk_context* ctx)
 			for (i = 0; i < count; i++)
 			{
 				PNODE gpu = NWL_NodeEnumChild(g_ctx.lib.NwGpu->PciList, i);
-				nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
+				nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, (1.0f-0.2f-g_ctx.gui_ratio)/2, (1.0f-0.2f-g_ctx.gui_ratio)/2 });
 				nk_lhsc(ctx, NWL_NodeAttrGet(gpu, "Vendor"), NK_TEXT_LEFT, g_color_text_d, nk_true, nk_true);
 				nk_lhc(ctx, NWL_NodeAttrGet(gpu, "Device"), NK_TEXT_LEFT, g_color_text_d);
 				nk_lhc(ctx, NWL_NodeAttrGet(gpu, "Device"), NK_TEXT_LEFT, g_color_text_l);
@@ -968,7 +1068,7 @@ draw_display(struct nk_context* ctx)
 
 		nk_bool is_new = gnwinfo_hw_compare_available() && !saved_id;
 
-		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
+		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, (1.0f-0.2f-g_ctx.gui_ratio)/2, (1.0f-0.2f-g_ctx.gui_ratio)/2 });
 
 		if (is_new)
 		{
@@ -1089,7 +1189,7 @@ draw_display(struct nk_context* ctx)
 			{
 				if(g_hw_has_diff == nk_false)
 				g_hw_has_diff = nk_true;
-				nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
+				nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, (1.0f-0.2f-g_ctx.gui_ratio)/2, (1.0f-0.2f-g_ctx.gui_ratio)/2 });
 				nk_lhc(ctx, u8"已移除", NK_TEXT_LEFT, g_color_warning);
 
 				char saved_buf[MAX_PATH] = {0};
@@ -1323,7 +1423,7 @@ draw_storage(struct nk_context* ctx)
 		LPCSTR saved_prod = gnwinfo_hw_compare_get_array_item("Disks", NULL, i, "Product ID");
 		nk_bool is_new = gnwinfo_hw_compare_available() && !saved_size;
 
-		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
+		nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, (1.0f-0.2f-g_ctx.gui_ratio)/2, (1.0f-0.2f-g_ctx.gui_ratio)/2 });
 		snprintf(m_buf, MAX_PATH, "%s%s %s%s",
 			prefix,
 			id,
@@ -1376,7 +1476,7 @@ draw_storage(struct nk_context* ctx)
 		LPCSTR health = NWL_NodeAttrGet(disk, "Health Status");
 		if ((g_ctx.main_flag & MAIN_DISK_SMART) && strcmp(health, "-") != 0)
 		{
-			nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
+			nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, (1.0f-0.2f-g_ctx.gui_ratio)/2, (1.0f-0.2f-g_ctx.gui_ratio)/2 });
 			nk_spacer(ctx);
 
 			LPCSTR life = strchr(health, '(');
@@ -1474,7 +1574,7 @@ draw_storage(struct nk_context* ctx)
 			LPCSTR saved_part = gnwinfo_hw_compare_get_array_item("Disks", NULL, i, "Partition Table");
 			LPCSTR saved_prod = gnwinfo_hw_compare_get_array_item("Disks", NULL, i, "Product ID");
 
-			nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
+			nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, (1.0f-0.2f-g_ctx.gui_ratio)/2, (1.0f-0.2f-g_ctx.gui_ratio)/2 });
 			if(g_hw_has_diff == nk_false)
 			g_hw_has_diff = nk_true;
 			nk_lhc(ctx, u8"已移除", NK_TEXT_LEFT, g_color_warning);
@@ -1497,7 +1597,7 @@ draw_storage(struct nk_context* ctx)
 
 			if (saved_health && saved_health[0] != '\0' && strcmp(saved_health, "-") != 0)
 			{
-				nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2 });
+				nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, (1.0f-0.2f-g_ctx.gui_ratio)/2, (1.0f-0.2f-g_ctx.gui_ratio)/2 });
 				nk_spacer(ctx);
 
 				GETTEXT_STR_ID saved_whealth = N__UNKNOWN;
@@ -1770,24 +1870,46 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 			int cols = gnwinfo_get_smart_history_cols(selected_csv);
 			
 			if (rows > 0 && cols > 0) {
+				static const char* critical_ids[] = {
+					"01 ", "03 ", "05 ", "10 ", "13 ", "14 ", "15 ", "191 ", "187 ", "199 ", "231 ", NULL
+				};
+				
+				int critical_cols[64] = {0};
+				int critical_count = 0;
+				critical_cols[critical_count++] = 0;
+				
+				for (int c = 1; c < cols && critical_count < 64; c++) {
+					const char* cell = gnwinfo_get_smart_history_cell(selected_csv, 0, c);
+					if (cell) {
+						for (int i = 0; critical_ids[i] != NULL; i++) {
+							if (strncmp(cell, critical_ids[i], 3) == 0) {
+								critical_cols[critical_count++] = c;
+								break;
+							}
+						}
+					}
+				}
+				
 				float col_width = 280.0f;
 				float time_width = 180.0f;
 				
-				nk_layout_row_begin(ctx, NK_STATIC, 0, cols);
-				for (int c = 0; c < cols; c++) {
+				nk_layout_row_begin(ctx, NK_STATIC, 0, critical_count);
+				for (int i = 0; i < critical_count; i++) {
+					int c = critical_cols[i];
 					float width = (c == 0) ? time_width : col_width;
 					nk_layout_row_push(ctx, width);
 					const char* cell = gnwinfo_get_smart_history_cell(selected_csv, 0, c);
 					if (cell)
-						nk_lhc(ctx, cell, NK_TEXT_LEFT, g_color_text_d);
+						nk_lhc(ctx, translate_smart_header(cell), NK_TEXT_LEFT, g_color_text_d);
 					else
 						nk_lhc(ctx, "", NK_TEXT_LEFT, g_color_text_d);
 				}
 				nk_layout_row_end(ctx);
 				
 				for (int r = rows - 1; r >= 1; r--) {
-					nk_layout_row_begin(ctx, NK_STATIC, 0, cols);
-					for (int c = 0; c < cols; c++) {
+					nk_layout_row_begin(ctx, NK_STATIC, 0, critical_count);
+					for (int i = 0; i < critical_count; i++) {
+						int c = critical_cols[i];
 						float width = (c == 0) ? time_width : col_width;
 						nk_layout_row_push(ctx, width);
 						const char* cell = gnwinfo_get_smart_history_cell(selected_csv, r, c);
@@ -1871,23 +1993,50 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 	}
 
 	if (g_ctx.main_flag & MAIN_INFO_OS)
+	{
 		draw_os(ctx);
+		draw_group_separator(ctx);
+	}
 	if (g_ctx.main_flag & MAIN_INFO_BIOS)
+	{
 		draw_bios(ctx);
+		draw_group_separator(ctx);
+	}
 	if (g_ctx.main_flag & MAIN_INFO_BOARD)
+	{
 		draw_computer(ctx);
+		draw_group_separator(ctx);
+	}
 	if (g_ctx.main_flag & MAIN_INFO_CPU)
+	{
 		draw_processor(ctx);
+		draw_group_separator(ctx);
+	}
 	if (g_ctx.main_flag & MAIN_INFO_MEMORY)
+	{
 		draw_memory(ctx);
+		draw_group_separator(ctx);
+	}
 	if (g_ctx.main_flag & MAIN_INFO_MONITOR)
+	{
 		draw_display(ctx);
+		draw_group_separator(ctx);
+	}
 	if (g_ctx.main_flag & MAIN_INFO_STORAGE)
+	{
 		draw_storage(ctx);
+		draw_group_separator(ctx);
+	}
 	if (g_ctx.main_flag & MAIN_INFO_NETWORK)
+	{
 		draw_network(ctx);
+		draw_group_separator(ctx);
+	}
 	if (g_ctx.main_flag & MAIN_INFO_AUDIO)
+	{
 		draw_audio(ctx);
+		draw_group_separator(ctx);
+	}
 	draw_pci_simple(ctx);
 
 out:

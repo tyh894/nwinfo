@@ -22,6 +22,7 @@ LPCWSTR NWL_Utf8ToUcs2(LPCSTR src);
 unsigned int g_init_width = 600;
 unsigned int g_init_height = 800;
 unsigned int g_init_alpha = 255;
+unsigned int g_smart_interval = 600;
 GdipFont* g_font = NULL;
 int g_font_size = 12;
 double g_dpi_factor = 1.0;
@@ -842,6 +843,9 @@ wWinMain(_In_ HINSTANCE hInstance,
 	g_init_width =  strtoul(gnwinfo_get_ini_value(L"Window", L"Width", L"1000"), NULL, 10);
 	g_init_height = strtoul(gnwinfo_get_ini_value(L"Window", L"Height", L"700"), NULL, 10);
 	g_init_alpha = strtoul(gnwinfo_get_ini_value(L"Window", L"Alpha", L"255"), NULL, 10);
+	g_smart_interval = strtoul(gnwinfo_get_ini_value(L"Window", L"SmartInterval", L"600"), NULL, 10);
+	if (g_smart_interval < 60) g_smart_interval = 60;
+	if (g_smart_interval > 86400) g_smart_interval = 86400;
 	g_font_size = strtol(gnwinfo_get_ini_value(L"Window", L"FontSize", L"16"), NULL, 10);
 	str = gnwinfo_get_ini_value(L"Window", L"AutoStart", L"-1");
 	if (strcmp(str, "-1") == 0)

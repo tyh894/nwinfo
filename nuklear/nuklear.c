@@ -590,6 +590,8 @@ nk_lhsc(struct nk_context* ctx, const char* str,
 	int text_len;
 	struct nk_rect bounds;
 	struct nk_text text;
+	const char* display_str = str;
+	char truncated_buf[512] = {0};
 
 	NK_ASSERT(ctx);
 	NK_ASSERT(ctx->current);
@@ -611,19 +613,48 @@ nk_lhsc(struct nk_context* ctx, const char* str,
 	}
 
 	text_len = nk_strlen(str);
+	
+	float text_width = style->font->width(style->font->userdata, style->font->height, str, text_len);
+	float max_width = bounds.w - 2 * style->text.padding.x;
+	
+	if (text_width > max_width && max_width > 0)
+	{
+		int truncated_len = 0;
+		float ellipsis_width = style->font->width(style->font->userdata, style->font->height, "...", 3);
+		float available_width = max_width - ellipsis_width;
+		
+		if (available_width > 0)
+		{
+			for (int i = 0; i < text_len && i < (int)sizeof(truncated_buf) - 4; i++)
+			{
+				float char_width = style->font->width(style->font->userdata, style->font->height, str, i + 1);
+				if (char_width > available_width)
+					break;
+				truncated_buf[i] = str[i];
+				truncated_len = i + 1;
+			}
+			truncated_buf[truncated_len] = '.';
+			truncated_buf[truncated_len + 1] = '.';
+			truncated_buf[truncated_len + 2] = '.';
+			truncated_buf[truncated_len + 3] = '\0';
+			display_str = truncated_buf;
+			text_len = truncated_len + 3;
+		}
+	}
+	
 	text.padding.x = style->text.padding.x;
 	text.padding.y = style->text.padding.y;
 	text.background = style->window.background;
 	text.text = color;
-	nk_widget_text(&win->buffer, bounds, str, text_len, &text, alignment, style->font);
+	nk_widget_text(&win->buffer, bounds, display_str, text_len, &text, alignment, style->font);
 
 	if (nk_input_is_mouse_hovering_rect(&ctx->input, bounds))
 	{
 		if (hover)
-			nk_hover_colored(ctx, str, text_len, color);
+			nk_hover_colored(ctx, str, nk_strlen(str), color);
 
 		if (nk_input_is_key_pressed(&ctx->input, NK_KEY_COPY))
-			ctx->clip.copy(ctx->clip.userdata, str, text_len);
+			ctx->clip.copy(ctx->clip.userdata, str, nk_strlen(str));
 	}
 }
 
