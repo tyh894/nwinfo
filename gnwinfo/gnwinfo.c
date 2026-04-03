@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Unlicense
+
 
 #include "gnwinfo.h"
 #include "gettext.h"
@@ -28,6 +28,7 @@ double g_dpi_factor = 1.0;
 nk_bool g_dpi_scaling = 1;
 nk_bool g_bginfo = 0;
 nk_bool g_debug = 0;
+nk_bool g_startup_mode = 0;
 
 nk_bool g_tray_created = 0;
 nk_bool g_autostart = 0;
@@ -191,7 +192,7 @@ void gnwinfo_set_autostart_internal(nk_bool enable, nk_bool show_message)
 		if (SUCCEEDED(hr))
 		{
 			BSTR bstrAuthor = alloc_bstr(L"gnwinfo");
-			BSTR bstrDesc = alloc_bstr(L"NWinfo GUI autostart task");
+			BSTR bstrDesc = alloc_bstr(L"?????");
 			pRegInfo->lpVtbl->put_Author(pRegInfo, bstrAuthor);
 			pRegInfo->lpVtbl->put_Description(pRegInfo, bstrDesc);
 			SysFreeString(bstrAuthor);
@@ -246,6 +247,9 @@ void gnwinfo_set_autostart_internal(nk_bool enable, nk_bool show_message)
 					BSTR bstrPath = alloc_bstr(path);
 					pExecAction->lpVtbl->put_Path(pExecAction, bstrPath);
 					SysFreeString(bstrPath);
+					BSTR bstrArgs = alloc_bstr(L"/startup");
+					pExecAction->lpVtbl->put_Arguments(pExecAction, bstrArgs);
+					SysFreeString(bstrArgs);
 					pExecAction->lpVtbl->Release(pExecAction);
 				}
 				pAction->lpVtbl->Release(pAction);
@@ -315,7 +319,7 @@ cleanup:
 	{
 		if (enable)
 		{
-			MessageBoxW(NULL, L"??????????????\n\n???????????????????\n???????????????????????????", L"???????????", MB_OK | MB_ICONINFORMATION);
+			MessageBoxW(NULL, L"???????????????\n\n???????????????????\n????????????????????????????", L"???????????", MB_OK | MB_ICONINFORMATION);
 		}
 		else
 		{
@@ -391,6 +395,9 @@ void gnwinfo_save_hw_config(void)
 	WCHAR* last_slash = wcsrchr(hw_path, L'\\');
 	if (last_slash)
 		*(last_slash + 1) = L'\0';
+	wcscat_s(hw_path, MAX_PATH, L"data");
+	CreateDirectoryW(hw_path, NULL);
+	wcscat_s(hw_path, MAX_PATH, L"\\");
 
 	time(&now);
 	localtime_s(&tm_info, &now);
@@ -427,7 +434,7 @@ static void create_tray_icon(HWND wnd)
 	g_nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
 	g_nid.uCallbackMessage = WM_TRAYMESSAGE;
 	g_nid.hIcon = LoadIconW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(IDI_ICON1));
-	wcscpy_s(g_nid.szTip, ARRAYSIZE(g_nid.szTip), L"NWinfo");
+	wcscpy_s(g_nid.szTip, ARRAYSIZE(g_nid.szTip), L"\x5de5\x63a7\x673a\x54e8\x5175");
 	Shell_NotifyIconW(NIM_ADD, &g_nid);
 	g_tray_created = 1;
 }
@@ -479,16 +486,26 @@ set_dpi_scaling(HWND wnd)
 	}
 	if (g_dpi_scaling)
 	{
-		RECT rect = { 0 };
 		UINT dpi = GetDpiForWindow(wnd);
-		g_dpi_factor = 1.0 * dpi / m_dpi;
+		double new_dpi_factor = (double)dpi / USER_DEFAULT_SCREEN_DPI;
+		double ratio = new_dpi_factor / g_dpi_factor;
+		
+		g_dpi_factor = new_dpi_factor;
 		m_dpi = dpi;
-		g_font_size = (int)(g_font_size * g_dpi_factor);
-		// resize window
+		
+		RECT rect = { 0 };
 		GetWindowRect(wnd, &rect);
-		SetWindowPos(wnd, NULL, 0, 0,
-			(int)((rect.right - rect.left) * g_dpi_factor), (int)((rect.bottom - rect.top) * g_dpi_factor),
+		int new_width = (int)((rect.right - rect.left) * ratio);
+		int new_height = (int)((rect.bottom - rect.top) * ratio);
+		
+		static int base_font_size = 0;
+		if (base_font_size == 0)
+			base_font_size = strtol(gnwinfo_get_ini_value(L"Window", L"FontSize", L"16"), NULL, 10);
+		g_font_size = (int)(base_font_size * g_dpi_factor);
+		
+		SetWindowPos(wnd, NULL, 0, 0, new_width, new_height,
 			SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+		nk_gdip_resize(new_width, new_height);
 	}
 	g_font = nk_gdip_load_font(font_name, g_font_size);
 	nk_gdip_set_font(g_font);
@@ -500,7 +517,14 @@ window_proc(HWND wnd, UINT msg, WPARAM wparam, LPARAM lparam)
 	switch (msg)
 	{
 	case WM_CREATE:
-		create_tray_icon(wnd);
+		if (g_startup_mode)
+		{
+			SetTimer(wnd, IDT_TIMER_TRAY_DELAY, 5000, NULL);
+		}
+		else
+		{
+			create_tray_icon(wnd);
+		}
 		break;
 	case WM_DESTROY:
 		remove_tray_icon();
@@ -516,7 +540,7 @@ window_proc(HWND wnd, UINT msg, WPARAM wparam, LPARAM lparam)
 		case ID_TRAY_SHOW:
 		{
 			struct nk_window* win;
-			const char* title = "NWinfo GUI";
+			const char* title = u8"ï¿½ï¿½ï¿½Ø»ï¿½ï¿½Ú±ï¿½";
 			for (win = g_ctx.nk->begin; win != NULL; win = win->next)
 			{
 				if (strcmp(win->name_string, title) == 0)
@@ -550,7 +574,7 @@ window_proc(HWND wnd, UINT msg, WPARAM wparam, LPARAM lparam)
 		case WM_LBUTTONDBLCLK:
 		{
 			struct nk_window* win;
-			const char* title = "NWinfo GUI";
+			const char* title = u8"ï¿½ï¿½ï¿½Ø»ï¿½ï¿½Ú±ï¿½";
 			for (win = g_ctx.nk->begin; win != NULL; win = win->next)
 			{
 				if (strcmp(win->name_string, title) == 0)
@@ -567,8 +591,37 @@ window_proc(HWND wnd, UINT msg, WPARAM wparam, LPARAM lparam)
 		}
 	}
 	break;
+	case WM_SHOWMAIN:
+	{
+		struct nk_window* win;
+		const char* title = u8"ï¿½ï¿½ï¿½Ø»ï¿½ï¿½Ú±ï¿½";
+		for (win = g_ctx.nk->begin; win != NULL; win = win->next)
+		{
+			if (strcmp(win->name_string, title) == 0)
+			{
+				win->flags &= ~NK_WINDOW_HIDDEN;
+				break;
+			}
+		}
+		memset(&g_ctx.nk->input, 0, sizeof(g_ctx.nk->input));
+		ShowWindow(wnd, SW_RESTORE);
+		SetForegroundWindow(wnd);
+		g_window_was_hidden = nk_false;
+	}
+	break;
 	case WM_TIMER:
-		gnwinfo_ctx_update(wparam);
+		if (wparam == IDT_TIMER_TRAY_DELAY)
+		{
+			if (!g_tray_created)
+			{
+				create_tray_icon(wnd);
+			}
+			KillTimer(wnd, IDT_TIMER_TRAY_DELAY);
+		}
+		else
+		{
+			gnwinfo_ctx_update(wparam);
+		}
 		break;
 	case WM_DEVICECHANGE:
 	{
@@ -585,8 +638,40 @@ window_proc(HWND wnd, UINT msg, WPARAM wparam, LPARAM lparam)
 	}
 		break;
 	case WM_DPICHANGED:
-		set_dpi_scaling(wnd);
-		break;
+	{
+		UINT dpi = HIWORD(wparam);
+		RECT* rect = (RECT*)lparam;
+		double new_dpi_factor = (double)dpi / USER_DEFAULT_SCREEN_DPI;
+		double ratio = new_dpi_factor / g_dpi_factor;
+		
+		g_dpi_factor = new_dpi_factor;
+		m_dpi = dpi;
+		
+		int new_width = rect->right - rect->left;
+		int new_height = rect->bottom - rect->top;
+		
+		SetWindowPos(wnd, NULL, rect->left, rect->top, new_width, new_height,
+			SWP_NOZORDER | SWP_NOACTIVATE);
+		
+		nk_gdip_resize(new_width, new_height);
+		
+		WCHAR font_name[64];
+		GetPrivateProfileStringW(L"Window", L"Font", L"-", font_name, 64, g_ini_path);
+		if (wcscmp(font_name, L"-") == 0)
+			wcscpy_s(font_name, 64, NWL_Utf8ToUcs2(N_(N__FONT_)));
+		if (g_font)
+		{
+			nk_gdipfont_del(g_font);
+			g_font = NULL;
+		}
+		static int base_font_size = 0;
+		if (base_font_size == 0)
+			base_font_size = strtol(gnwinfo_get_ini_value(L"Window", L"FontSize", L"16"), NULL, 10);
+		g_font_size = (int)(base_font_size * g_dpi_factor);
+		g_font = nk_gdip_load_font(font_name, g_font_size);
+		nk_gdip_set_font(g_font);
+	}
+	break;
 	case WM_POWERBROADCAST:
 		gnwinfo_ctx_update(IDT_TIMER_POWER);
 		break;
@@ -690,6 +775,10 @@ parse_cmdline(LPWSTR cmdline)
 			setvbuf(stderr, NULL, _IONBF, 0);
 			g_debug = 1;
 		}
+		else if (_wcsicmp(argv[i], L"/startup") == 0)
+		{
+			g_startup_mode = 1;
+		}
 	}
 	LocalFree(argv);
 }
@@ -711,16 +800,38 @@ wWinMain(_In_ HINSTANCE hInstance,
 	int needs_refresh = 1;
 	DWORD layered_flag = LWA_ALPHA;
 	HANDLE hMutex;
-
+//2026.5.1  
+	SYSTEMTIME expireDate = { 0 };
+	expireDate.wYear = 2026;
+	expireDate.wMonth = 5;
+	expireDate.wDay = 1;
+	SYSTEMTIME currentTime = { 0 };
+	GetLocalTime(&currentTime);
+	FILETIME ftExpire, ftCurrent;
+	SystemTimeToFileTime(&expireDate, &ftExpire);
+	SystemTimeToFileTime(&currentTime, &ftCurrent);
+	if (CompareFileTime(&ftCurrent, &ftExpire) > 0)
+	{
+		/*MessageBoxW(NULL, L"\x8f6f\x4ef6\x5df2\x8fc7\x671f\x2c\x65e0\x6cd5\x8fd0\x884c", 
+			L"\x5de5\x63a7\x673a\x54e8\x5175", MB_OK | MB_ICONERROR);*/
+		return 0;
+	}
+//time  end
 	parse_cmdline(lpCmdLine);
 
 	hMutex = CreateMutexW(NULL, TRUE, L"NWinfo{e25f6e37-d51b-4950-8949-510dfc86d913}");
 	if (GetLastError() == ERROR_ALREADY_EXISTS || !hMutex)
 	{
-		MessageBoxW(NULL, L"ALREADY RUNNING", L"ERROR", MB_ICONERROR | MB_OK);
+		HWND existingWnd = FindWindowW(L"NwinfoWindowClass", NULL);
+		if (existingWnd)
+		{
+			ShowWindow(existingWnd, SW_RESTORE);
+			SetForegroundWindow(existingWnd);
+			PostMessageW(existingWnd, WM_SHOWMAIN, 0, 0);
+		}
 		if (hMutex)
 			CloseHandle(hMutex);
-		return 1;
+		return 0;
 	}
 
 	GetModuleFileNameW(NULL, g_ini_path, MAX_PATH);
@@ -788,7 +899,7 @@ wWinMain(_In_ HINSTANCE hInstance,
 	wc.lpszClassName = L"NwinfoWindowClass";
 	RegisterClassW(&wc);
 
-	wnd = CreateWindowExW(exstyle, wc.lpszClassName, L"NWinfo GUI", style,
+	wnd = CreateWindowExW(exstyle, wc.lpszClassName, L"\x5de5\x63a7\x673a\x54e8\x5175", style,
 		x_pos, y_pos, (int)g_init_width, (int)g_init_height, NULL, NULL, wc.hInstance, NULL);
 
 	if (g_bginfo)
@@ -800,6 +911,12 @@ wWinMain(_In_ HINSTANCE hInstance,
 	}
 
 	SetLayeredWindowAttributes(wnd, RGB(g_color_back.r, g_color_back.g, g_color_back.b), (BYTE)g_init_alpha, layered_flag);
+
+	if (g_startup_mode)
+	{
+		ShowWindow(wnd, SW_HIDE);
+		g_window_was_hidden = nk_true;
+	}
 
 	/* GUI */
 	ctx = nk_gdip_init(wnd, g_init_width, g_init_height);

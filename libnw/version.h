@@ -17,6 +17,6 @@
 #define NWINFO_COPYRIGHT    "Copyright (c) 2026 A1ive"
 #define NWINFO_FILEDESC     "Hardware information utility for Windows"
 
-#define NWINFO_GUI          "NWinfo GUI"
+#define NWINFO_GUI          "¹¤¿Ø»úÉÚ±ø"
 #define NWINFO_CLI          "NWinfo CLI"
 #define NWINFO_DLL          "NWinfo DLL"

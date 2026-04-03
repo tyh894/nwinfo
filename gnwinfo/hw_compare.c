@@ -41,6 +41,10 @@ void gnwinfo_hw_compare_init(void)
 		return;
 	}
 
+	wcscat_s(search_path, MAX_PATH, L"data");
+	CreateDirectoryW(search_path, NULL);
+	wcscat_s(search_path, MAX_PATH, L"\\");
+
 	wcscpy_s(g_hw_json_path, MAX_PATH, search_path);
 	wcscat_s(search_path, MAX_PATH, L"hw_config_*.json");
 
@@ -140,6 +144,10 @@ void gnwinfo_hw_compare_reload(void)
 		*(last_slash + 1) = L'\0';
 	else
 		return;
+
+	wcscat_s(search_path, MAX_PATH, L"data");
+	CreateDirectoryW(search_path, NULL);
+	wcscat_s(search_path, MAX_PATH, L"\\");
 
 	wcscpy_s(g_hw_json_path, MAX_PATH, search_path);
 	wcscat_s(search_path, MAX_PATH, L"hw_config_*.json");
@@ -556,6 +564,83 @@ int gnwinfo_hw_compare_get_smbios_count(int table_type)
 			count++;
 	}
 	return count;
+}
+
+nk_bool gnwinfo_hw_compare_smbios_serial_exists(int table_type, LPCSTR serial)
+{
+	if (!g_hw_json || !serial || serial[0] == '\0' || serial[0] == '-')
+		return nk_false;
+
+	cJSON* smbios = cJSON_GetObjectItem(g_hw_json, "SMBIOS");
+	if (!smbios || !(smbios->type & cJSON_Array))
+		return nk_false;
+
+	int size = cJSON_GetArraySize(smbios);
+	for (int i = 0; i < size; i++)
+	{
+		cJSON* item = cJSON_GetArrayItem(smbios, i);
+		if (!item)
+			continue;
+
+		cJSON* type = cJSON_GetObjectItem(item, "Table Type");
+		if (type && (type->type & cJSON_Number) && type->valueint == table_type)
+		{
+			cJSON* serial_attr = cJSON_GetObjectItem(item, "Serial Number");
+			if (serial_attr && (serial_attr->type & cJSON_String))
+			{
+				if (strcmp(serial_attr->valuestring, serial) == 0)
+					return nk_true;
+			}
+		}
+	}
+	return nk_false;
+}
+
+LPCSTR gnwinfo_hw_compare_get_smbios_attr_by_serial(int table_type, LPCSTR serial, LPCSTR attr_name)
+{
+	if (!g_hw_json || !serial || serial[0] == '\0' || serial[0] == '-')
+		return NULL;
+
+	cJSON* smbios = cJSON_GetObjectItem(g_hw_json, "SMBIOS");
+	if (!smbios || !(smbios->type & cJSON_Array))
+		return NULL;
+
+	int size = cJSON_GetArraySize(smbios);
+	for (int i = 0; i < size; i++)
+	{
+		cJSON* item = cJSON_GetArrayItem(smbios, i);
+		if (!item)
+			continue;
+
+		cJSON* type = cJSON_GetObjectItem(item, "Table Type");
+		if (type && (type->type & cJSON_Number) && type->valueint == table_type)
+		{
+			cJSON* serial_attr = cJSON_GetObjectItem(item, "Serial Number");
+			if (serial_attr && (serial_attr->type & cJSON_String))
+			{
+				if (strcmp(serial_attr->valuestring, serial) == 0)
+				{
+					cJSON* attr = cJSON_GetObjectItem(item, attr_name);
+					if (!attr)
+						return NULL;
+
+					if (attr->type & cJSON_String)
+						return attr->valuestring;
+					if (attr->type & cJSON_Number)
+					{
+						char* buf = get_num_buf();
+						if (attr->valueint == (int)attr->valuedouble)
+							snprintf(buf, 32, "%d", attr->valueint);
+						else
+							snprintf(buf, 32, "%.2f", attr->valuedouble);
+						return buf;
+					}
+					return NULL;
+				}
+			}
+		}
+	}
+	return NULL;
 }
 
 LPCWSTR gnwinfo_hw_compare_get_path(void)

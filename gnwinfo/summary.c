@@ -421,7 +421,7 @@ draw_computer(struct nk_context* ctx)
 			NWL_NodeAttrGet(g_ctx.battery, "Battery Life Percentage"),
 			time);
 	nk_lhc(ctx, m_buf, NK_TEXT_LEFT, g_color_text_l);
-	if (quick_access_button(ctx, GET_PNG(IDR_PNG_BATTERY), NULL))
+	if (quick_access_button(ctx, GET_PNG(IDR_PNG_BATTERY), N_(N__POWER_STAT)))
 		ShellExecuteW(GetDesktopWindow(), NULL,
 			L"shell:::{025A5937-A6BE-4686-A844-36FE4BEC8B6D}",
 			NULL, NULL, SW_NORMAL);
@@ -627,7 +627,6 @@ draw_mem_dmi(struct nk_context* ctx)
 	}
 
 	int saved_device_count = gnwinfo_hw_compare_get_smbios_count(17);
-	int max_count = current_device_count > saved_device_count ? current_device_count : saved_device_count;
 
 	int device_index = 0;
 	for (INT i = 0; i < count; i++)
@@ -640,13 +639,14 @@ draw_mem_dmi(struct nk_context* ctx)
 		if (ddr[0] == '-')
 			continue;
 
-		LPCSTR saved_ddr = gnwinfo_hw_compare_get_smbios_attr_by_index(17, device_index, "Device Type");
-		LPCSTR saved_speed = gnwinfo_hw_compare_get_smbios_attr_by_index(17, device_index, "Speed (MT/s)");
-		LPCSTR saved_size = gnwinfo_hw_compare_get_smbios_attr_by_index(17, device_index, "Device Size");
-		LPCSTR saved_manuf = gnwinfo_hw_compare_get_smbios_attr_by_index(17, device_index, "Manufacturer");
-		LPCSTR saved_serial = gnwinfo_hw_compare_get_smbios_attr_by_index(17, device_index, "Serial Number");
+		LPCSTR current_serial = NWL_NodeAttrGet(tab, "Serial Number");
+		LPCSTR saved_ddr = gnwinfo_hw_compare_get_smbios_attr_by_serial(17, current_serial, "Device Type");
+		LPCSTR saved_speed = gnwinfo_hw_compare_get_smbios_attr_by_serial(17, current_serial, "Speed (MT/s)");
+		LPCSTR saved_size = gnwinfo_hw_compare_get_smbios_attr_by_serial(17, current_serial, "Device Size");
+		LPCSTR saved_manuf = gnwinfo_hw_compare_get_smbios_attr_by_serial(17, current_serial, "Manufacturer");
+		LPCSTR saved_serial = gnwinfo_hw_compare_get_smbios_attr_by_serial(17, current_serial, "Serial Number");
 
-		nk_bool is_new = gnwinfo_hw_compare_available() && !saved_ddr;
+		nk_bool is_new = gnwinfo_hw_compare_available() && !gnwinfo_hw_compare_smbios_serial_exists(17, current_serial);
 
 		if (is_new)
 		{
@@ -712,32 +712,52 @@ draw_mem_dmi(struct nk_context* ctx)
 		device_index++;
 	}
 
-	if (gnwinfo_hw_compare_available() && saved_device_count > current_device_count)
+	if (gnwinfo_hw_compare_available())
 	{
-		for (int i = current_device_count; i < saved_device_count; i++)
+		for (int i = 0; i < saved_device_count; i++)
 		{
+			LPCSTR saved_serial = gnwinfo_hw_compare_get_smbios_attr_by_index(17, i, "Serial Number");
+			if (!saved_serial || saved_serial[0] == '\0' || saved_serial[0] == '-')
+				continue;
+
+			nk_bool found_in_current = nk_false;
+			for (INT j = 0; j < count && !found_in_current; j++)
+			{
+				PNODE tab = NWL_NodeEnumChild(g_ctx.smbios, j);
+				LPCSTR attr = NWL_NodeAttrGet(tab, "Table Type");
+				if (strcmp(attr, "17") != 0)
+					continue;
+				LPCSTR ddr = NWL_NodeAttrGet(tab, "Device Type");
+				if (ddr[0] == '-')
+					continue;
+				LPCSTR current_serial = NWL_NodeAttrGet(tab, "Serial Number");
+				if (current_serial && strcmp(current_serial, saved_serial) == 0)
+				{
+					found_in_current = nk_true;
+				}
+			}
+
+			if (found_in_current)
+				continue;
+
 			LPCSTR saved_ddr = gnwinfo_hw_compare_get_smbios_attr_by_index(17, i, "Device Type");
 			LPCSTR saved_speed = gnwinfo_hw_compare_get_smbios_attr_by_index(17, i, "Speed (MT/s)");
 			LPCSTR saved_size = gnwinfo_hw_compare_get_smbios_attr_by_index(17, i, "Device Size");
 			LPCSTR saved_manuf = gnwinfo_hw_compare_get_smbios_attr_by_index(17, i, "Manufacturer");
-			LPCSTR saved_serial = gnwinfo_hw_compare_get_smbios_attr_by_index(17, i, "Serial Number");
 
-			if (saved_ddr)
-			{
-				nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2});
-				nk_lhc(ctx, u8"ÒÑÒÆ³ý", NK_TEXT_LEFT, g_color_warning);
+			nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2});
+			nk_lhc(ctx, u8"ÒÑÒÆ³ý", NK_TEXT_LEFT, g_color_warning);
 
-				char saved_buf[MAX_PATH] = {0};
-				snprintf(saved_buf, MAX_PATH, "%s-%s %s %s %s",
-					saved_ddr,
-					saved_speed ? saved_speed : "-",
-					saved_size,
-					saved_manuf,
-					saved_serial);
+			char saved_buf[MAX_PATH] = {0};
+			snprintf(saved_buf, MAX_PATH, "%s-%s %s %s %s",
+				saved_ddr,
+				saved_speed ? saved_speed : "-",
+				saved_size,
+				saved_manuf,
+				saved_serial);
 
-				nk_lhc(ctx, saved_buf, NK_TEXT_LEFT, g_color_warning);
-				nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_warning);
-			}
+			nk_lhc(ctx, saved_buf, NK_TEXT_LEFT, g_color_warning);
+			nk_lhc(ctx, "-", NK_TEXT_LEFT, g_color_warning);
 		}
 	}
 }
@@ -1598,7 +1618,7 @@ draw_audio(struct nk_context* ctx)
 
 	nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 1.0f - g_ctx.gui_ratio, g_ctx.gui_ratio });
 	nk_image_label(ctx, GET_PNG(IDR_PNG_MM), N_(N__AUDIO), NK_TEXT_LEFT, g_color_text_d);
-	if (quick_access_button(ctx, GET_PNG(IDR_PNG_SETTINGS), NULL))
+	if (quick_access_button(ctx, GET_PNG(IDR_PNG_SOUND), NULL))
 		ShellExecuteW(NULL, NULL, L"::{26EE0668-A00A-44D7-9371-BEB064C98683}\\2\\::{F2DDFC82-8F12-4CDD-B7DC-D4FE1425AA4D}", NULL, NULL, SW_NORMAL);
 	nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.7f, 0.3f });
 	for (i = 0; i < g_ctx.audio_count; i++)
@@ -1616,7 +1636,7 @@ VOID
 gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 {
 	struct nk_window* win;
-	const char* title = "NWinfo GUI";
+	const char* title = u8"¹¤¿Ø»úÉÚ±ø";
 	for (win = ctx->begin; win != NULL; win = win->next)
 	{
 		if (strcmp(win->name_string, title) == 0)
@@ -1655,7 +1675,7 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 			break;
 		}
 	}
-	if (!nk_begin_ex(ctx, "NWinfo GUI",
+	if (!nk_begin_ex(ctx, u8"¹¤¿Ø»úÉÚ±ø",
 		nk_rect(0, 0, width, height),
 		g_bginfo ? NK_WINDOW_BACKGROUND : (NK_WINDOW_BACKGROUND | NK_WINDOW_CLOSABLE | NK_WINDOW_TITLE),
 		nk_image_id(0), GET_PNG(IDR_PNG_CLOSE)))
@@ -1668,18 +1688,19 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 		return;
 	}
 
-	nk_layout_row_begin(ctx, NK_DYNAMIC, 0, 6);
+	nk_layout_row_begin(ctx, NK_DYNAMIC, 30, 6);
 
 	struct nk_rect rect = nk_layout_widget_bounds(ctx);
-	g_ctx.gui_ratio = rect.h / rect.w;
+	float button_ratio = 30.0f / rect.w;
+	g_ctx.gui_ratio = 20.0f / rect.w;
 
-	nk_layout_row_push(ctx, g_ctx.gui_ratio);
+	nk_layout_row_push(ctx, button_ratio);
 	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_SENSOR), N_(N__SENSOR_VIEW)))
 		display_interface = 0;
-	nk_layout_row_push(ctx, g_ctx.gui_ratio);
+	nk_layout_row_push(ctx, button_ratio);
 	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_SETTINGS), N_(N__SETTINGS)))
 		g_ctx.window_flag |= GUI_WINDOW_SETTINGS;
-	nk_layout_row_push(ctx, g_ctx.gui_ratio);
+	nk_layout_row_push(ctx, button_ratio);
 	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_REFRESH), N_(N__REFRESH)))
 	{
 		gnwinfo_ctx_update(IDT_TIMER_1M);
@@ -1687,18 +1708,18 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 		gnwinfo_ctx_update(IDT_TIMER_DISPLAY);
 		gnwinfo_ctx_update(IDT_TIMER_SMB);
 	}
-	nk_layout_row_push(ctx, g_ctx.gui_ratio);
+	nk_layout_row_push(ctx, button_ratio);
 	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_INFO), N_(N__ABOUT)))
 		g_ctx.window_flag |= GUI_WINDOW_ABOUT;
-	nk_layout_row_push(ctx, g_ctx.gui_ratio);
-	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_PCI), u8"²âÊÔ"))
+	nk_layout_row_push(ctx, button_ratio);
+	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_DISK), u8"Ó²ÅÌÐÅÏ¢"))
 		display_interface = 1;
-	nk_layout_row_push(ctx, g_ctx.gui_ratio);
-	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_PCI), u8"À¶ÆÁ"))
+	nk_layout_row_push(ctx, button_ratio);
+	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_PC), u8"À¶ÆÁ¼ÇÂ¼"))
 		display_interface = 2;
 	nk_layout_row_push(ctx, g_ctx.gui_ratio);
-	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_CLOSE), N_(N__CLOSE)))
-		InterlockedExchange(&g_ctx.exit_pending, 1);
+	// if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_CLOSE), N_(N__CLOSE)))
+	// 	InterlockedExchange(&g_ctx.exit_pending, 1);
 	nk_layout_row_end(ctx);
 
 	if (display_interface == 1)

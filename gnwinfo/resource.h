@@ -31,8 +31,10 @@
 #define IDR_PNG_MONITOR                 134
 #define IDR_PNG_GPU                     135
 #define IDR_PNG_SENSOR                  136
+#define IDR_PNG_SOUND                   137
+#define BLUE_SCREEN                     138   
 
-#define IDR_PNG_MAX                     137
+#define IDR_PNG_MAX                     139
 
 #define IDT_TIMER_1S                    (1u << 0)
 #define IDT_TIMER_1M                    (1u << 1)
@@ -42,6 +44,7 @@
 #define IDT_TIMER_SMB                   (1u << 5)
 #define IDT_TIMER_SPD                   (1u << 6)
 #define IDT_TIMER_SMART_HISTORY         (1u << 7)
+#define IDT_TIMER_TRAY_DELAY            (1u << 8)
 
 // Next default values for new objects
 // 

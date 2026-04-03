@@ -25,6 +25,7 @@ NK_API GdipFont* nk_gdipfont_create_from_memory(const void* membuf, int membufSi
 NK_API void nk_gdipfont_del(GdipFont *font);
 
 NK_API struct nk_context* nk_gdip_init(HWND hwnd, unsigned int width, unsigned int height);
+NK_API void nk_gdip_resize(unsigned int width, unsigned int height);
 NK_API void nk_gdip_set_font(GdipFont *font);
 NK_API int nk_gdip_handle_event(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
 NK_API void nk_gdip_render(enum nk_anti_aliasing AA, struct nk_color clear);
@@ -413,6 +414,7 @@ static struct {
     GpStringFormat *format;
     GpFontCollection *fontCollection[10];
     INT curFontCollection;
+    HWND hwnd;
 
     struct nk_context ctx;
 } gdip;
@@ -843,6 +845,7 @@ nk_gdip_init(HWND hwnd, unsigned int width, unsigned int height)
     GdiplusStartupInput startup = { 1, NULL, FALSE, TRUE };
     GdiplusStartup(&gdip.token, &startup, NULL);
 
+    gdip.hwnd = hwnd;
     GdipCreateFromHWND(hwnd, &gdip.window);
     GdipCreateBitmapFromGraphics(width, height, gdip.window, &gdip.bitmap);
     GdipGetImageGraphicsContext(gdip.bitmap, &gdip.memory);
@@ -860,6 +863,35 @@ nk_gdip_init(HWND hwnd, unsigned int width, unsigned int height)
     gdip.ctx.clip.paste = nk_gdip_clipboard_paste;
     gdip.curFontCollection = 0;
     return &gdip.ctx;
+}
+
+NK_API void
+nk_gdip_resize(unsigned int width, unsigned int height)
+{
+    if (gdip.bitmap)
+    {
+        GdipDisposeImage(gdip.bitmap);
+        gdip.bitmap = NULL;
+    }
+    if (gdip.memory)
+    {
+        GdipDeleteGraphics(gdip.memory);
+        gdip.memory = NULL;
+    }
+    if (gdip.window)
+    {
+        GdipDeleteGraphics(gdip.window);
+        gdip.window = NULL;
+    }
+    if (gdip.hwnd)
+    {
+        GdipCreateFromHWND(gdip.hwnd, &gdip.window);
+        if (gdip.window)
+        {
+            GdipCreateBitmapFromGraphics(width, height, gdip.window, &gdip.bitmap);
+            GdipGetImageGraphicsContext(gdip.bitmap, &gdip.memory);
+        }
+    }
 }
 
 NK_API void

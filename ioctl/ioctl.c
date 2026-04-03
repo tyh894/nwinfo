@@ -193,6 +193,7 @@ static int load_pio_mod(struct pio_mod_t* mod, LPCWSTR name)
 
 	GetModuleFileNameW(NULL, path, MAX_PATH);
 	PathCchRemoveFileSpec(path, MAX_PATH);
+	PathCchAppend(path, MAX_PATH, L"lib");
 	PathCchAppend(path, MAX_PATH, name);
 
 	hFile = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);

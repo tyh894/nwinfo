@@ -72,6 +72,9 @@
     <ClInclude Include="lang\sl_SI.h">
       <Filter>Lang</Filter>
     </ClInclude>
+    <ClInclude Include="cJSON.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="gnwinfo.c">
@@ -123,6 +126,18 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="sensors.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="cJSON.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="hw_compare.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="smart_history.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="bsod.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -214,6 +229,9 @@
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="icons\sensor.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="icons\battery1.png">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>

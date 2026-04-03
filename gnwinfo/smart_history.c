@@ -226,6 +226,9 @@ void gnwinfo_smart_history_init(void)
     char* last_slash = strrchr(g_csv_path, '\\');
     if (last_slash)
         *(last_slash + 1) = '\0';
+    strcat_s(g_csv_path, MAX_PATH_LEN, "data");
+    CreateDirectoryA(g_csv_path, NULL);
+    strcat_s(g_csv_path, MAX_PATH_LEN, "\\");
 }
 
 void gnwinfo_smart_history_fini(void)

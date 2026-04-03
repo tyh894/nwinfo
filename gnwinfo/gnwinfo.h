@@ -31,6 +31,7 @@
 
 #define ID_TRAY_ICON 1001
 #define WM_TRAYMESSAGE (WM_USER + 100)
+#define WM_SHOWMAIN (WM_USER + 101)
 #define ID_TRAY_EXIT 2001
 #define ID_TRAY_SHOW 2002
 
@@ -38,6 +39,7 @@
 
 GdipFont*
 nk_gdip_load_font(LPCWSTR name, int size);
+void nk_gdip_resize(unsigned int width, unsigned int height);
 
 nk_bool
 nk_begin_ex(struct nk_context* ctx, const char* title,
@@ -185,6 +187,7 @@ extern double g_dpi_factor;
 extern nk_bool g_dpi_scaling;
 extern nk_bool g_bginfo;
 extern nk_bool g_debug;
+extern nk_bool g_startup_mode;
 extern nk_bool g_autostart;
 extern nk_bool g_tray_created;
 extern nk_bool g_need_save_hw_config;
@@ -261,6 +264,8 @@ int gnwinfo_hw_compare_get_array_size(LPCSTR node_name, LPCSTR child_name);
 nk_bool gnwinfo_hw_compare_is_different(LPCSTR current_value, LPCSTR saved_value);
 LPCSTR gnwinfo_hw_compare_get_smbios_attr(int table_type, LPCSTR attr_name);
 LPCSTR gnwinfo_hw_compare_get_smbios_attr_by_index(int table_type, int index, LPCSTR attr_name);
+LPCSTR gnwinfo_hw_compare_get_smbios_attr_by_serial(int table_type, LPCSTR serial, LPCSTR attr_name);
+nk_bool gnwinfo_hw_compare_smbios_serial_exists(int table_type, LPCSTR serial);
 int gnwinfo_hw_compare_get_smbios_count(int table_type);
 LPCWSTR gnwinfo_hw_compare_get_path(void);
 nk_bool gnwinfo_hw_compare_check_changes(void);

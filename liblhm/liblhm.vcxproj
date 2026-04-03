@@ -117,6 +117,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
       <ModuleDefinitionFile>exports.def</ModuleDefinitionFile>
+      <ImportLibrary>$(SolutionDir)$(Platform)\$(Configuration)\lib\$(TargetName).lib</ImportLibrary>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
@@ -160,7 +161,7 @@
   </ImportGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
-      <ErrorText>è¿™å°è®¡ç®—æœºä¸Šç¼ºå°‘æ­¤é¡¹ç›®å¼•ç”¨çš„ NuGet ç¨‹åºåŒ…ã€‚ä½¿ç”¨â€œNuGet ç¨‹åºåŒ…è¿˜åŸâ€å¯ä¸‹è½½è¿™äº›ç¨‹åºåŒ…ã€‚æœ‰å…³æ›´å¤šä¿¡æ¯ï¼Œè¯·å‚è§ http://go.microsoft.com/fwlink/?LinkID=322105ã€‚ç¼ºå°‘çš„æ–‡ä»¶æ˜¯ {0}ã€‚</ErrorText>
+      <ErrorText>ÕâÌ¨¼ÆËã»úÉÏÈ±ÉÙ´ËÏîÄ¿ÒıÓÃµÄ NuGet ³ÌĞò°ü¡£Ê¹ÓÃ¡°NuGet ³ÌĞò°ü»¹Ô­¡±¿ÉÏÂÔØÕâĞ©³ÌĞò°ü¡£ÓĞ¹Ø¸ü¶àĞÅÏ¢£¬Çë²Î¼û http://go.microsoft.com/fwlink/?LinkID=322105¡£È±ÉÙµÄÎÄ¼şÊÇ {0}¡£</ErrorText>
     </PropertyGroup>
     <Error Condition="!Exists('..\packages\VC-LTL.5.3.1\build\native\VC-LTL.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\VC-LTL.5.3.1\build\native\VC-LTL.props'))" />
     <Error Condition="!Exists('..\packages\YY.NuGet.Import.Helper.1.0.2\build\native\YY.NuGet.Import.Helper.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\YY.NuGet.Import.Helper.1.0.2\build\native\YY.NuGet.Import.Helper.props'))" />
