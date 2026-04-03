@@ -276,6 +276,7 @@ int gnwinfo_hw_compare_get_pci_count(void);
 void gnwinfo_hw_compare_get_pci_removed_devices(void (*callback)(LPCSTR hwid, LPCSTR location, LPCSTR desc, void* userdata), void* userdata);
 
 void gnwinfo_smart_history_init(void);
+BOOL gnwinfo_smart_history_has_csv(void);
 void gnwinfo_smart_history_fini(void);
 void gnwinfo_save_smart_history(void);
 void gnwinfo_load_smart_history(void);

@@ -31,9 +31,36 @@ draw_group_background(struct nk_context* ctx, int group_idx)
 	g_group_index = group_idx;
 }
 
+static const char* translate_health_status(const char* health)
+{
+	static char result[64];
+	if (health == NULL || health[0] == '\0') {
+		return u8"未知";
+	}
+	
+	const char* cn_status = u8"未知";
+	if (strstr(health, "Good") != NULL) {
+		cn_status = u8"良好";
+	} else if (strstr(health, "Caution") != NULL) {
+		cn_status = u8"警告";
+	} else if (strstr(health, "Bad") != NULL) {
+		cn_status = u8"不良";
+	}
+	
+	int percent = -1;
+	if (sscanf_s(health, "%d%%", &percent) == 1 && percent >= 0 && percent <= 100) {
+		_snprintf_s(result, sizeof(result), _TRUNCATE, "%d%% %s", percent, cn_status);
+	} else {
+		strcpy_s(result, sizeof(result), cn_status);
+	}
+	
+	return result;
+}
+
 static const char* translate_smart_header(const char* cell)
 {
 	if (strcmp(cell, "Time") == 0) return u8"时间";
+	if (strcmp(cell, "Health") == 0) return u8"健康状态";
 	
 	if (strlen(cell) >= 2) {
 		unsigned int id;
@@ -1824,7 +1851,6 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 
 	if (display_interface == 1)
 	{
-		static int selected_csv = 0;
 		gnwinfo_load_smart_history();
 		int csv_count = gnwinfo_get_smart_history_count();
 		
@@ -1832,94 +1858,150 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 			nk_layout_row(ctx, NK_DYNAMIC, 0, 1, (float[1]) { 1.0f });
 			nk_lhc(ctx, u8"没有找到SMART历史数据文件", NK_TEXT_LEFT, g_color_text_l);
 		} else {
-			for (int i = 0; i < csv_count; i++) {
-				if (i % 4 == 0) {
-					nk_layout_row(ctx, NK_DYNAMIC, 30, 4, (float[4]) { 0.25f, 0.25f, 0.25f, 0.25f });
-				}
-				const char* filename = gnwinfo_get_smart_history_filename(i);
+			static const char* critical_ids[] = {
+				"01 ", "03 ", "05 ", "10 ", "13 ", "14 ", "15 ", "191 ", "187 ", "199 ", "231 ", NULL
+			};
+			
+			for (int csv_idx = 0; csv_idx < csv_count; csv_idx++) {
+				const char* filename = gnwinfo_get_smart_history_filename(csv_idx);
 				if (filename) {
 					const char* basename = strrchr(filename, '\\');
 					if (basename) basename++;
 					else basename = filename;
 					
-					char display_name[64] = {0};
-					const char* underscore = strchr(basename, '_');
-					if (underscore) {
-						underscore++;
-						const char* diskdata = strstr(underscore, "_diskdata");
+					char display_name[128] = {0};
+					char drive_letter = '\0';
+					char serial[64] = {0};
+					
+					if (basename[0] && basename[1] == '_' && basename[2] != '\0') {
+						drive_letter = basename[0];
+						const char* serial_start = basename + 2;
+						const char* diskdata = strstr(serial_start, "_diskdata");
 						if (diskdata) {
-							int len = (int)(diskdata - underscore);
+							int len = (int)(diskdata - serial_start);
 							if (len > 0 && len < 64) {
-								strncpy_s(display_name, sizeof(display_name), underscore, len);
+								strncpy_s(serial, sizeof(serial), serial_start, len);
+							}
+						}
+					} else {
+						const char* underscore = strchr(basename, '_');
+						if (underscore) {
+							underscore++;
+							const char* diskdata = strstr(underscore, "_diskdata");
+							if (diskdata) {
+								int len = (int)(diskdata - underscore);
+								if (len > 0 && len < 64) {
+									strncpy_s(serial, sizeof(serial), underscore, len);
+								}
 							}
 						}
 					}
-					if (display_name[0] == '\0') {
+					
+					int rows = gnwinfo_get_smart_history_rows(csv_idx);
+					int cols = gnwinfo_get_smart_history_cols(csv_idx);
+					const char* health = "";
+					if (rows > 0 && cols > 1) {
+						health = gnwinfo_get_smart_history_cell(csv_idx, rows - 1, 1);
+						if (health == NULL) health = "";
+					}
+					
+					if (drive_letter && serial[0]) {
+						if (health[0]) {
+							_snprintf_s(display_name, sizeof(display_name), _TRUNCATE, "%c: (%s) - %s", drive_letter, serial, translate_health_status(health));
+						} else {
+							_snprintf_s(display_name, sizeof(display_name), _TRUNCATE, "%c: (%s)", drive_letter, serial);
+						}
+					} else if (serial[0]) {
+						if (health[0]) {
+							_snprintf_s(display_name, sizeof(display_name), _TRUNCATE, "%s - %s", serial, translate_health_status(health));
+						} else {
+							strcpy_s(display_name, sizeof(display_name), serial);
+						}
+					} else {
 						strcpy_s(display_name, sizeof(display_name), basename);
 					}
 					
-					if (nk_button_label(ctx, display_name)) {
-						selected_csv = i;
-					}
+					nk_layout_row(ctx, NK_DYNAMIC, 25, 1, (float[1]) { 1.0f });
+					nk_lhcf(ctx, NK_TEXT_LEFT, g_color_text_d, u8"硬盘: %s", display_name);
 				}
-			}
-			
-			nk_layout_row(ctx, NK_DYNAMIC, 10, 1, (float[1]) { 1.0f });
-			
-			int rows = gnwinfo_get_smart_history_rows(selected_csv);
-			int cols = gnwinfo_get_smart_history_cols(selected_csv);
-			
-			if (rows > 0 && cols > 0) {
-				static const char* critical_ids[] = {
-					"01 ", "03 ", "05 ", "10 ", "13 ", "14 ", "15 ", "191 ", "187 ", "199 ", "231 ", NULL
-				};
 				
-				int critical_cols[64] = {0};
-				int critical_count = 0;
-				critical_cols[critical_count++] = 0;
+				int rows = gnwinfo_get_smart_history_rows(csv_idx);
+				int cols = gnwinfo_get_smart_history_cols(csv_idx);
 				
-				for (int c = 1; c < cols && critical_count < 64; c++) {
-					const char* cell = gnwinfo_get_smart_history_cell(selected_csv, 0, c);
-					if (cell) {
-						for (int i = 0; critical_ids[i] != NULL; i++) {
-							if (strncmp(cell, critical_ids[i], 3) == 0) {
-								critical_cols[critical_count++] = c;
-								break;
+				if (rows > 0 && cols > 0) {
+					int critical_cols[64] = {0};
+					int critical_count = 0;
+					critical_cols[critical_count++] = 0;
+					critical_cols[critical_count++] = 1;
+					
+					for (int c = 2; c < cols && critical_count < 64; c++) {
+						const char* cell = gnwinfo_get_smart_history_cell(csv_idx, 0, c);
+						if (cell) {
+							for (int i = 0; critical_ids[i] != NULL; i++) {
+								if (strncmp(cell, critical_ids[i], 3) == 0) {
+									critical_cols[critical_count++] = c;
+									break;
+								}
 							}
 						}
 					}
-				}
-				
-				float col_width = 280.0f;
-				float time_width = 180.0f;
-				
-				nk_layout_row_begin(ctx, NK_STATIC, 0, critical_count);
-				for (int i = 0; i < critical_count; i++) {
-					int c = critical_cols[i];
-					float width = (c == 0) ? time_width : col_width;
-					nk_layout_row_push(ctx, width);
-					const char* cell = gnwinfo_get_smart_history_cell(selected_csv, 0, c);
-					if (cell)
-						nk_lhc(ctx, translate_smart_header(cell), NK_TEXT_LEFT, g_color_text_d);
-					else
-						nk_lhc(ctx, "", NK_TEXT_LEFT, g_color_text_d);
-				}
-				nk_layout_row_end(ctx);
-				
-				for (int r = rows - 1; r >= 1; r--) {
-					nk_layout_row_begin(ctx, NK_STATIC, 0, critical_count);
-					for (int i = 0; i < critical_count; i++) {
-						int c = critical_cols[i];
-						float width = (c == 0) ? time_width : col_width;
-						nk_layout_row_push(ctx, width);
-						const char* cell = gnwinfo_get_smart_history_cell(selected_csv, r, c);
-						if (cell)
-							nk_lhc(ctx, cell, NK_TEXT_LEFT, g_color_text_l);
-						else
-							nk_lhc(ctx, "", NK_TEXT_LEFT, g_color_text_l);
+					
+					float col_width = 280.0f;
+					float time_width = 180.0f;
+					float health_width = 120.0f;
+					float row_height = 22.0f;
+					
+					float table_height = 250.0f;
+					if (rows > 1) {
+						table_height = (rows > 10) ? 250.0f : (float)(rows * row_height + 30);
 					}
-					nk_layout_row_end(ctx);
+					
+					nk_layout_row(ctx, NK_DYNAMIC, table_height, 1, (float[1]) { 1.0f });
+					
+					char group_name[32];
+					_snprintf_s(group_name, sizeof(group_name), _TRUNCATE, "smart_table_%d", csv_idx);
+					
+					if (nk_group_begin(ctx, group_name, NK_WINDOW_BORDER)) {
+						float widths[64];
+						for (int i = 0; i < critical_count && i < 64; i++) {
+							int c = critical_cols[i];
+							if (c == 0) widths[i] = time_width;
+							else if (c == 1) widths[i] = health_width;
+							else widths[i] = col_width;
+						}
+						
+						nk_layout_row(ctx, NK_STATIC, row_height, critical_count, widths);
+						for (int i = 0; i < critical_count; i++) {
+							int c = critical_cols[i];
+							const char* cell = gnwinfo_get_smart_history_cell(csv_idx, 0, c);
+							if (cell)
+								nk_lhc(ctx, translate_smart_header(cell), NK_TEXT_LEFT, g_color_text_d);
+							else
+								nk_lhc(ctx, "", NK_TEXT_LEFT, g_color_text_d);
+						}
+						
+						for (int r = rows - 1; r >= 1; r--) {
+							nk_layout_row(ctx, NK_STATIC, row_height, critical_count, widths);
+							for (int i = 0; i < critical_count; i++) {
+								int c = critical_cols[i];
+								const char* cell = gnwinfo_get_smart_history_cell(csv_idx, r, c);
+								if (cell) {
+									if (c == 1) {
+										nk_lhc(ctx, translate_health_status(cell), NK_TEXT_LEFT, g_color_text_l);
+									} else {
+										nk_lhc(ctx, cell, NK_TEXT_LEFT, g_color_text_l);
+									}
+								} else {
+									nk_lhc(ctx, "", NK_TEXT_LEFT, g_color_text_l);
+								}
+							}
+						}
+						nk_group_end(ctx);
+					}
 				}
+				
+				nk_layout_row(ctx, NK_DYNAMIC, 10, 1, (float[1]) { 1.0f });
+				draw_group_separator(ctx);
 			}
 		}
 		goto out;

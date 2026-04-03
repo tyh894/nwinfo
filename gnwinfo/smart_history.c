@@ -231,6 +231,24 @@ void gnwinfo_smart_history_init(void)
     strcat_s(g_csv_path, MAX_PATH_LEN, "\\");
 }
 
+BOOL gnwinfo_smart_history_has_csv(void)
+{
+    if (g_csv_path[0] == '\0')
+        return FALSE;
+    
+    char search_path[MAX_PATH_LEN];
+    strcpy_s(search_path, sizeof(search_path), g_csv_path);
+    strcat_s(search_path, sizeof(search_path), "*_diskdata.csv");
+    
+    WIN32_FIND_DATAA find_data;
+    HANDLE hFind = FindFirstFileA(search_path, &find_data);
+    if (hFind == INVALID_HANDLE_VALUE)
+        return FALSE;
+    
+    FindClose(hFind);
+    return TRUE;
+}
+
 void gnwinfo_smart_history_fini(void)
 {
     if (g_smart)
@@ -306,7 +324,7 @@ void gnwinfo_save_smart_history(void)
                 FILE* fp = NULL;
                 fopen_s(&fp, filename, "w");
                 if (fp != NULL) {
-                    fprintf(fp, "Time,");
+                    fprintf(fp, "Time,Health,");
                     for (DWORD i = 0; i < attr_count; i++) {
                         BYTE id = cdi_get_smart_id(g_smart, disk_index, i);
                         if (id == 0) continue;
@@ -324,6 +342,19 @@ void gnwinfo_save_smart_history(void)
                     char timestamp[32];
                     get_timestamp(timestamp, sizeof(timestamp));
                     fprintf(fp, "%s,", timestamp);
+                    
+                    int health_status = cdi_get_int(g_smart, disk_index, CDI_INT_DISK_STATUS);
+                    int life_percent = cdi_get_int(g_smart, disk_index, CDI_INT_LIFE);
+                    const char* health_str = "Unknown";
+                    if (health_status == 1) health_str = "Good";
+                    else if (health_status == 2) health_str = "Caution";
+                    else if (health_status == 3) health_str = "Bad";
+                    
+                    if (life_percent >= 0 && life_percent <= 100) {
+                        fprintf(fp, "%d%% %s,", life_percent, health_str);
+                    } else {
+                        fprintf(fp, "%s,", health_str);
+                    }
                     
                     for (DWORD i = 0; i < attr_count; i++) {
                         BYTE id = cdi_get_smart_id(g_smart, disk_index, i);
@@ -368,6 +399,19 @@ void gnwinfo_save_smart_history(void)
         char timestamp[32];
         get_timestamp(timestamp, sizeof(timestamp));
         fprintf(fp, "%s,", timestamp);
+        
+        int health_status = cdi_get_int(g_smart, disk_index, CDI_INT_DISK_STATUS);
+        int life_percent = cdi_get_int(g_smart, disk_index, CDI_INT_LIFE);
+        const char* health_str = "Unknown";
+        if (health_status == 1) health_str = "Good";
+        else if (health_status == 2) health_str = "Caution";
+        else if (health_status == 3) health_str = "Bad";
+        
+        if (life_percent >= 0 && life_percent <= 100) {
+            fprintf(fp, "%d%% %s,", life_percent, health_str);
+        } else {
+            fprintf(fp, "%s,", health_str);
+        }
         
         for (DWORD i = 0; i < attr_count; i++) {
             BYTE id = cdi_get_smart_id(g_smart, disk_index, i);

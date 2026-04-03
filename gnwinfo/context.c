@@ -736,6 +736,17 @@ gnwinfo_ctx_init(HINSTANCE inst, HWND wnd, struct nk_context* ctx, float width, 
 		{
 		}
 	}
+	
+	if (!gnwinfo_smart_history_has_csv())
+	{
+		__try
+		{
+			gnwinfo_save_smart_history();
+		}
+		__except(EXCEPTION_EXECUTE_HANDLER)
+		{
+		}
+	}
 }
 
 noreturn void
