@@ -694,6 +694,27 @@ draw_processor(struct nk_context* ctx)
 		nk_lhc(ctx, m_buf, NK_TEXT_LEFT, g_color_text_l);
 	}
 }
+static VOID
+draw_processor_simple(struct nk_context* ctx)
+{
+	PNODE cpu = NWL_NodeEnumChild(g_ctx.cpuid, 0);
+	LPCSTR cores = cpu ? NWL_NodeAttrGet(cpu, "Cores") : "-";
+	LPCSTR threads = cpu ? NWL_NodeAttrGet(cpu, "Logical CPUs") : "-";
+	
+	nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.5f, 0.5f });
+	nk_image_label(ctx, GET_PNG(IDR_PNG_CPU), u8"CPU 使用率", NK_TEXT_LEFT, g_color_text_d);
+	nk_lhcf(ctx, NK_TEXT_LEFT, gnwinfo_get_color(g_ctx.cpu_usage, 70.0, 90.0),
+		"%.1f%%", g_ctx.cpu_usage);
+	
+	nk_layout_row(ctx, NK_DYNAMIC, 0, 1, (float[1]) { 1.0f });
+	gnwinfo_draw_percent_prog(ctx, g_ctx.cpu_usage);
+	
+	nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.5f, 0.5f });
+	snprintf(m_buf, MAX_PATH, u8"核心数：%s 核 / %s 线程", cores ? cores : "-", threads ? threads : "-");
+	nk_lhc(ctx, m_buf, NK_TEXT_LEFT, g_color_text_l);
+	snprintf(m_buf, MAX_PATH, u8"频率：%lu MHz", g_ctx.cpu_freq);
+	nk_lhc(ctx, m_buf, NK_TEXT_LEFT, g_color_text_l);
+}
 
 static VOID
 draw_mem_capacity(struct nk_context* ctx)
@@ -969,7 +990,24 @@ draw_memory(struct nk_context* ctx)
 			draw_mem_dmi(ctx);
 	}
 }
-
+static VOID
+draw_memory_simple(struct nk_context* ctx)
+{
+	nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.5f, 0.5f });
+	nk_image_label(ctx, GET_PNG(IDR_PNG_MEMORY), u8"内存使用", NK_TEXT_LEFT, g_color_text_d);
+	nk_lhcf(ctx, NK_TEXT_LEFT,
+		gnwinfo_get_color((double)g_ctx.mem_status.PhysUsage, 70.0, 90.0),
+		"%lu%%", g_ctx.mem_status.PhysUsage);
+	
+	nk_layout_row(ctx, NK_DYNAMIC, 0, 1, (float[1]) { 1.0f });
+	gnwinfo_draw_percent_prog(ctx, (double)g_ctx.mem_status.PhysUsage);
+	
+	nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.5f, 0.5f });
+	snprintf(m_buf, MAX_PATH, u8"剩余：%s", g_ctx.mem_status.StrPhysAvail);
+	nk_lhc(ctx, m_buf, NK_TEXT_LEFT, g_color_text_l);
+	snprintf(m_buf, MAX_PATH, u8"总量：%s", g_ctx.mem_status.StrPhysTotal);
+	nk_lhc(ctx, m_buf, NK_TEXT_LEFT, g_color_text_l);
+}
 static VOID
 draw_display(struct nk_context* ctx)
 {
@@ -1523,6 +1561,8 @@ draw_storage(struct nk_context* ctx)
 			nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.2f, (1.0f-0.2f-g_ctx.gui_ratio)/2, (1.0f-0.2f-g_ctx.gui_ratio)/2 });
 			nk_spacer(ctx);
 
+			//draw_volume(ctx, disk, cdrom);	
+
 			LPCSTR life = strchr(health, '(');
 			GETTEXT_STR_ID whealth = N__UNKNOWN;
 			struct nk_color color = g_color_unknown;
@@ -1673,7 +1713,114 @@ draw_storage(struct nk_context* ctx)
 	else
 		draw_net_drive_compact(ctx);
 }
+static VOID
+draw_storage_simple(struct nk_context* ctx)
+{
+	nk_layout_row(ctx, NK_DYNAMIC, 0, 1, (float[1]) { 1.0f});
+	nk_image_label(ctx, GET_PNG(IDR_PNG_DISK), N_(N__STORAGE), NK_TEXT_LEFT, g_color_text_d);
+	// if (quick_access_button(ctx, GET_PNG(IDR_PNG_SMART), "S.M.A.R.T."))
+	// 	g_ctx.window_flag |= GUI_WINDOW_SMART;
 
+	INT count = NWL_NodeChildCount(g_ctx.disk);
+
+	for (INT i = 0; i < count; i++)
+	{
+		BOOL cdrom;
+		LPCSTR prefix = "HD";
+		LPCSTR path, id = "-";
+		LPCSTR ssd = "";
+		PNODE disk = NWL_NodeEnumChild(g_ctx.disk, i);
+		if (!disk)
+			continue;
+		path = NWL_NodeAttrGet(disk, "Path");
+		if (strncmp(path, "\\\\.\\CdRom", 9) == 0)
+		{
+			cdrom = TRUE;
+			prefix = "CD";
+			id = &path[9];
+		}
+		else if (strncmp(path, "\\\\.\\PhysicalDrive", 17) == 0)
+		{
+			cdrom = FALSE;
+			id = &path[17];
+			if (strcmp(NWL_NodeAttrGet(disk, "SSD"), NA_BOOL_TRUE) == 0)
+				ssd = " SSD";
+			if (strcmp(NWL_NodeAttrGet(disk, "Removable"), NA_BOOL_TRUE) == 0)
+				prefix = "RM";
+		}
+		else
+		{
+			cdrom = FALSE;
+			prefix = "HD";
+		}
+
+		nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.5f, 0.5f });
+		snprintf(m_buf, MAX_PATH, "%s%s %s%s",
+			prefix,
+			id,
+			NWL_NodeAttrGet(disk, "Type"),
+			ssd);
+		nk_lhsc(ctx, m_buf, NK_TEXT_LEFT, g_color_text_d, nk_true, nk_true);
+
+		LPCSTR health = NWL_NodeAttrGet(disk, "Health Status");
+		if ((g_ctx.main_flag & MAIN_DISK_SMART) && strcmp(health, "-") != 0)
+		{
+			// draw_volume(ctx, disk, cdrom);	
+			LPCSTR life = strchr(health, '(');
+			GETTEXT_STR_ID whealth = N__UNKNOWN;
+			struct nk_color color = g_color_unknown;
+			LPCSTR temp = NWL_NodeAttrGet(disk, "Temperature (C)");
+			if (strncmp(health, "Good", 4) == 0)
+			{
+				color = g_color_good;
+				whealth = N__GOOD;
+			}
+			else if (strncmp(health, "Caution", 7) == 0)
+			{
+				color = g_color_warning;
+				whealth = N__CAUTION;
+			}
+			else if (strncmp(health, "Bad", 3) == 0)
+			{
+				color = g_color_error;
+				whealth = N__BAD;
+			}
+
+			char current_health_buf[MAX_PATH] = {0};
+			if (life && life[0] != '\0')
+			{
+				snprintf(current_health_buf, MAX_PATH, "%s%s", N_(whealth), life);
+			}
+			else
+			{
+				snprintf(current_health_buf, MAX_PATH, "%s", N_(whealth));
+			}
+
+			nk_lhcf(ctx, NK_TEXT_LEFT, color,
+				u8"%s %s"TEMP_CELSIUS_SYMBOL, current_health_buf,
+				temp[0] == '-' ? "-" : temp);
+		}
+		else
+		{
+			nk_spacing(ctx, 1);
+		}
+
+		nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.1f, 0.9f });
+		nk_spacer(ctx);
+
+		nk_lhcf(ctx, NK_TEXT_LEFT,
+			g_color_text_l,
+			"%s %s %s",
+			NWL_NodeAttrGet(disk, "Size"),
+			NWL_NodeAttrGet(disk, "Partition Table"),
+			NWL_NodeAttrGet(disk, "Product ID"));
+	}
+
+	if (g_ctx.main_flag & MAIN_DISK_COMPACT)
+		draw_net_drive(ctx);
+	else
+		draw_net_drive_compact(ctx);
+}
 
 static LPCSTR
 get_first_ipv4(PNODE node)
@@ -1787,6 +1934,8 @@ int gnwinfo_get_display_interface(void)
 static VOID
 draw_startup_screen(struct nk_context* ctx, float width, float height)
 {
+	struct nk_window* win = ctx->current;
+	
 	float content_height = g_ctx.gui_title;
 	
 	if (g_title_font == NULL)
@@ -1798,7 +1947,7 @@ draw_startup_screen(struct nk_context* ctx, float width, float height)
 		g_title_font = nk_gdip_load_font(font_name, (int)(22 * g_dpi_factor));
 	}
 	
-	nk_layout_row(ctx, NK_STATIC, content_height * 0.35f, 1, (float[1]) { width });
+	nk_layout_row(ctx, NK_STATIC, content_height * 0.1f, 1, (float[1]) { width });
 	nk_spacing(ctx, 1);
 	
 	nk_layout_row_begin(ctx, NK_STATIC, 50, 5);
@@ -1807,7 +1956,7 @@ draw_startup_screen(struct nk_context* ctx, float width, float height)
 		nk_spacing(ctx, 1);
 		
 		nk_layout_row_push(ctx, 50);
-		if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_DIR), ""))
+		if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_COMPUTER), ""))
 		{
 			display_interface = -1;
 		}
@@ -1831,12 +1980,31 @@ draw_startup_screen(struct nk_context* ctx, float width, float height)
 		}
 		
 		nk_layout_row_push(ctx, width * 0.15f);
+		nk_layout_row(ctx, NK_STATIC, 5, 1, (float[1]) { width });
 		nk_spacing(ctx, 1);
 	}
 	nk_layout_row_end(ctx);
 	
-	nk_layout_row(ctx, NK_STATIC, content_height * 0.35f, 1, (float[1]) { width });
-	nk_spacing(ctx, 1);
+	float startup_content_height = height - 50 - g_ctx.gui_title - 10;
+	nk_layout_row(ctx, NK_STATIC, startup_content_height, 1, (float[1]) { width });
+	if (nk_group_begin(ctx, "startup_content", 0))
+	{
+		draw_processor_simple(ctx);
+		draw_group_separator(ctx);
+		nk_layout_row(ctx, NK_STATIC, 10, 1, (float[1]) { width });
+		nk_spacing(ctx, 1);
+
+		draw_memory_simple(ctx);
+		draw_group_separator(ctx);
+		nk_layout_row(ctx, NK_STATIC, 10, 1, (float[1]) { width });
+		nk_spacing(ctx, 1);
+
+		draw_storage_simple(ctx);   
+		draw_group_separator(ctx);
+		nk_layout_row(ctx, NK_STATIC, 10, 1, (float[1]) { width });
+		nk_spacing(ctx, 1);
+		nk_group_end(ctx);
+	}
 }
 
 VOID
@@ -1932,7 +2100,7 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_PC), u8"蓝屏记录"))
 		display_interface = 2;
 	nk_layout_row_push(ctx, button_ratio);
-	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_DIR), u8"返回首页"))
+	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_COMPUTER), u8"返回首页"))
 		display_interface = -1;
 	nk_layout_row_push(ctx, g_ctx.gui_ratio);
 	nk_layout_row_end(ctx);

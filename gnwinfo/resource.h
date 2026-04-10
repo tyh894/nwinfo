@@ -33,8 +33,9 @@
 #define IDR_PNG_SENSOR                  136
 #define IDR_PNG_SOUND                   137
 #define BLUE_SCREEN                     138   
+#define IDR_PNG_COMPUTER                139 
 
-#define IDR_PNG_MAX                     139
+#define IDR_PNG_MAX                     140
 
 #define IDT_TIMER_1S                    (1u << 0)
 #define IDT_TIMER_1M                    (1u << 1)
