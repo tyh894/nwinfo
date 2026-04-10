@@ -31,17 +31,18 @@ void gnwinfo_hw_compare_init(void)
 	FILETIME latest_time = {0};
 	WCHAR latest_file[MAX_PATH] = {0};
 
-	GetModuleFileNameW(NULL, search_path, MAX_PATH);
-	WCHAR* last_slash = wcsrchr(search_path, L'\\');
-	if (last_slash)
-		*(last_slash + 1) = L'\0';
+	if (GetEnvironmentVariableW(L"USERPROFILE", search_path, MAX_PATH) > 0)
+	{
+		wcscat_s(search_path, MAX_PATH, L"\\herosys_data");
+	}
 	else
 	{
-		g_need_initial_save = nk_true;
-		return;
+		GetModuleFileNameW(NULL, search_path, MAX_PATH);
+		WCHAR* last_slash = wcsrchr(search_path, L'\\');
+		if (last_slash)
+			*(last_slash + 1) = L'\0';
+		wcscat_s(search_path, MAX_PATH, L"herosys_data");
 	}
-
-	wcscat_s(search_path, MAX_PATH, L"data");
 	CreateDirectoryW(search_path, NULL);
 	wcscat_s(search_path, MAX_PATH, L"\\");
 
@@ -138,14 +139,18 @@ void gnwinfo_hw_compare_reload(void)
 
 	printf("DEBUG: gnwinfo_hw_compare_reload() called\n");
 
-	GetModuleFileNameW(NULL, search_path, MAX_PATH);
-	WCHAR* last_slash = wcsrchr(search_path, L'\\');
-	if (last_slash)
-		*(last_slash + 1) = L'\0';
+	if (GetEnvironmentVariableW(L"USERPROFILE", search_path, MAX_PATH) > 0)
+	{
+		wcscat_s(search_path, MAX_PATH, L"\\herosys_data");
+	}
 	else
-		return;
-
-	wcscat_s(search_path, MAX_PATH, L"data");
+	{
+		GetModuleFileNameW(NULL, search_path, MAX_PATH);
+		WCHAR* last_slash = wcsrchr(search_path, L'\\');
+		if (last_slash)
+			*(last_slash + 1) = L'\0';
+		wcscat_s(search_path, MAX_PATH, L"herosys_data");
+	}
 	CreateDirectoryW(search_path, NULL);
 	wcscat_s(search_path, MAX_PATH, L"\\");
 

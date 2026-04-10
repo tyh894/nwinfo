@@ -392,11 +392,28 @@ void gnwinfo_save_hw_config(void)
 		NWL_NodeAttrSet(display_settings, "Scale", buf, 0);
 	}
 
-	GetModuleFileNameW(NULL, hw_path, MAX_PATH);
-	WCHAR* last_slash = wcsrchr(hw_path, L'\\');
-	if (last_slash)
-		*(last_slash + 1) = L'\0';
-	wcscat_s(hw_path, MAX_PATH, L"data");
+	time(&now);
+	localtime_s(&tm_info, &now);
+	char timestamp_buf[64];
+	strftime(timestamp_buf, sizeof(timestamp_buf), "%Y-%m-%d %H:%M:%S", &tm_info);
+	PNODE config_info = NWL_NodeAppendNew(NWLC->NwRoot, "ConfigInfo", 0);
+	if (config_info)
+	{
+		NWL_NodeAttrSet(config_info, "Timestamp", timestamp_buf, 0);
+	}
+
+	if (GetEnvironmentVariableW(L"USERPROFILE", hw_path, MAX_PATH) > 0)
+	{
+		wcscat_s(hw_path, MAX_PATH, L"\\herosys_data");
+	}
+	else
+	{
+		GetModuleFileNameW(NULL, hw_path, MAX_PATH);
+		WCHAR* last_slash = wcsrchr(hw_path, L'\\');
+		if (last_slash)
+			*(last_slash + 1) = L'\0';
+		wcscat_s(hw_path, MAX_PATH, L"herosys_data");
+	}
 	CreateDirectoryW(hw_path, NULL);
 	wcscat_s(hw_path, MAX_PATH, L"\\");
 
@@ -903,8 +920,11 @@ wWinMain(_In_ HINSTANCE hInstance,
 	wc.lpszClassName = L"NwinfoWindowClass";
 	RegisterClassW(&wc);
 
+	unsigned int startup_width = (unsigned int)(500 * g_dpi_factor);
+	unsigned int startup_height = (unsigned int)(600 * g_dpi_factor);
+
 	wnd = CreateWindowExW(exstyle, wc.lpszClassName, L"\x5de5\x63a7\x673a\x54e8\x5175", style,
-		x_pos, y_pos, (int)g_init_width, (int)g_init_height, NULL, NULL, wc.hInstance, NULL);
+		x_pos, y_pos, startup_width, startup_height, NULL, NULL, wc.hInstance, NULL);
 
 	if (g_bginfo)
 	{
@@ -923,12 +943,12 @@ wWinMain(_In_ HINSTANCE hInstance,
 	}
 
 	/* GUI */
-	ctx = nk_gdip_init(wnd, g_init_width, g_init_height);
+	ctx = nk_gdip_init(wnd, startup_width, startup_height);
 	set_dpi_scaling(wnd);
 
 	(void)CoInitializeEx(0, COINIT_MULTITHREADED | COINIT_DISABLE_OLE1DDE);
 	gnwinfo_set_style(ctx);
-	gnwinfo_ctx_init(hInstance, wnd, ctx, (float)(g_init_width * g_dpi_factor), (float)(g_init_height * g_dpi_factor));
+	gnwinfo_ctx_init(hInstance, wnd, ctx, (float)(startup_width), (float)(startup_height));
 
 	while (running)
 	{
@@ -960,6 +980,26 @@ wWinMain(_In_ HINSTANCE hInstance,
 
 		/* GUI */
 		AcquireSRWLockExclusive(&g_ctx.lock);
+		
+		static int last_interface = -2;
+		int current_interface = gnwinfo_get_display_interface();
+		if (current_interface != last_interface)
+		{
+			last_interface = current_interface;
+			if (current_interface == -1)
+			{
+				int startup_width = (int)(500 * g_dpi_factor);
+				int startup_height = (int)(600 * g_dpi_factor);
+				SetWindowPos(wnd, NULL, 0, 0, startup_width, startup_height, SWP_NOMOVE | SWP_NOZORDER);
+				nk_gdip_resize(startup_width, startup_height);
+			}
+			else if (current_interface == 0 || current_interface == 1 || current_interface == 2)
+			{
+				SetWindowPos(wnd, NULL, 0, 0, (int)g_init_width, (int)g_init_height, SWP_NOMOVE | SWP_NOZORDER);
+				nk_gdip_resize((int)g_init_width, (int)g_init_height);
+			}
+		}
+		
 		if (g_ctx.window_flag & GUI_WINDOW_SETTINGS)
 			gnwinfo_set_style(ctx);
 		gnwinfo_draw_main_window(ctx, g_ctx.gui_width, g_ctx.gui_height);

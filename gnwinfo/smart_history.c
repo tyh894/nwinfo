@@ -222,11 +222,18 @@ void gnwinfo_smart_history_init(void)
     
     cdi_init_smart(g_smart, CDI_FLAG_DEFAULT);
     
-    GetModuleFileNameA(NULL, g_csv_path, MAX_PATH_LEN);
-    char* last_slash = strrchr(g_csv_path, '\\');
-    if (last_slash)
-        *(last_slash + 1) = '\0';
-    strcat_s(g_csv_path, MAX_PATH_LEN, "data");
+    if (GetEnvironmentVariableA("USERPROFILE", g_csv_path, MAX_PATH_LEN) > 0)
+    {
+        strcat_s(g_csv_path, MAX_PATH_LEN, "\\herosys_data");
+    }
+    else
+    {
+        GetModuleFileNameA(NULL, g_csv_path, MAX_PATH_LEN);
+        char* last_slash = strrchr(g_csv_path, '\\');
+        if (last_slash)
+            *(last_slash + 1) = '\0';
+        strcat_s(g_csv_path, MAX_PATH_LEN, "herosys_data");
+    }
     CreateDirectoryA(g_csv_path, NULL);
     strcat_s(g_csv_path, MAX_PATH_LEN, "\\");
 }

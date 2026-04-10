@@ -247,6 +247,8 @@ void gnwinfo_draw_percent_prog(struct nk_context* ctx, double percent);
 
 nk_bool gnwinfo_get_autostart(void);
 void gnwinfo_set_autostart(nk_bool enable);
+
+int gnwinfo_get_display_interface(void);
 void gnwinfo_set_autostart_internal(nk_bool enable, nk_bool show_message);
 void gnwinfo_save_hw_config(void);
 

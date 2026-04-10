@@ -232,7 +232,16 @@ gnwinfo_draw_settings_window(struct nk_context* ctx, float width, float height)
 	nk_spacer(ctx);
 	nk_checkbox_label(ctx, N_(N__DISABLE_ANTIALIASING), &g_ctx.gui_aa);
 	nk_spacer(ctx);
-	nk_checkbox_label(ctx, N_(N__AUTOSTART), &g_autostart);
+	{
+		nk_bool old_autostart = g_autostart;
+		nk_checkbox_label(ctx, N_(N__AUTOSTART), &g_autostart);
+		if (old_autostart != g_autostart)
+		{
+			nk_bool actual_enable = !g_autostart;
+			gnwinfo_set_ini_value(L"Window", L"AutoStart", L"%d", actual_enable);
+			gnwinfo_set_autostart_internal(actual_enable, nk_false);
+		}
+	}
 	nk_spacer(ctx);
 	nk_property_int(ctx, N_(N__SMART_INTERVAL), 60, (int*)&g_smart_interval, 86400, 10, 60);
 	nk_spacer(ctx);
@@ -282,9 +291,6 @@ gnwinfo_draw_settings_window(struct nk_context* ctx, float width, float height)
 		gnwinfo_set_ini_value(L"Window", L"HideSensitive", L"%u", g_ctx.lib.HideSensitive);
 		gnwinfo_set_ini_value(L"Window", L"DpiScaling", L"%d", g_dpi_scaling);
 		gnwinfo_set_ini_value(L"Window", L"AntiAliasing", L"%u", g_ctx.gui_aa);
-		nk_bool actual_enable = !g_autostart;
-		gnwinfo_set_ini_value(L"Window", L"AutoStart", L"%d", actual_enable);
-		gnwinfo_set_autostart_internal(actual_enable, nk_false);
 		set_ini_color(L"Background", g_color_back);
 		set_ini_color(L"Highlight", g_color_text_l);
 		set_ini_color(L"Default", g_color_text_d);

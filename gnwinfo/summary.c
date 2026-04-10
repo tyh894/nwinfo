@@ -151,6 +151,23 @@ draw_os(struct nk_context* ctx)
 	LPCSTR saved_arch = gnwinfo_hw_compare_get_string("System", "Processor Architecture");
 	LPCSTR saved_edition = gnwinfo_hw_compare_get_string("System", "Edition");
 	LPCSTR saved_build = gnwinfo_hw_compare_get_string("System", "Build Number");
+	LPCSTR saved_timestamp = gnwinfo_hw_compare_get_string("ConfigInfo", "Timestamp");
+	
+	nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.2f, (1.0f-0.2f-g_ctx.gui_ratio)/2, (1.0f-0.2f-g_ctx.gui_ratio)/2, g_ctx.gui_ratio });
+	nk_lhsc(ctx, u8"配置信息", NK_TEXT_LEFT, g_color_text_d, nk_false, nk_true);
+	
+	if (gnwinfo_hw_compare_available() && saved_timestamp && saved_timestamp[0] != '\0')
+	{
+		char saved_label[128];
+		_snprintf_s(saved_label, sizeof(saved_label), _TRUNCATE, u8"上次配置 - %s", saved_timestamp);
+		nk_lhc(ctx, saved_label, NK_TEXT_LEFT, g_color_text_d);
+	}
+	else
+	{
+		nk_lhc(ctx, u8"上次配置 - 无", NK_TEXT_LEFT, g_color_text_d);
+	}
+	nk_lhc(ctx, u8"当前配置", NK_TEXT_LEFT, g_color_text_l);
+	nk_spacing(ctx, 1);
 	
 	nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.2f, (1.0f-0.2f-g_ctx.gui_ratio)/2, (1.0f-0.2f-g_ctx.gui_ratio)/2, g_ctx.gui_ratio });
 	nk_image_label(ctx, GET_PNG(IDR_PNG_OS), N_(N__OS), NK_TEXT_LEFT, g_color_text_d);
@@ -1758,7 +1775,70 @@ draw_audio(struct nk_context* ctx)
 	}
 }
 
-static int display_interface = 0;
+static int display_interface = -1;
+static int last_display_interface = -2;
+static GdipFont* g_title_font = NULL;
+
+int gnwinfo_get_display_interface(void)
+{
+	return display_interface;
+}
+
+static VOID
+draw_startup_screen(struct nk_context* ctx, float width, float height)
+{
+	float content_height = g_ctx.gui_title;
+	
+	if (g_title_font == NULL)
+	{
+		WCHAR font_name[64];
+		GetPrivateProfileStringW(L"Window", L"Font", L"-", font_name, 64, g_ini_path);
+		if (wcscmp(font_name, L"-") == 0)
+			wcscpy_s(font_name, 64, L"Microsoft YaHei");
+		g_title_font = nk_gdip_load_font(font_name, (int)(22 * g_dpi_factor));
+	}
+	
+	nk_layout_row(ctx, NK_STATIC, content_height * 0.35f, 1, (float[1]) { width });
+	nk_spacing(ctx, 1);
+	
+	nk_layout_row_begin(ctx, NK_STATIC, 50, 5);
+	{
+		nk_layout_row_push(ctx, width * 0.25f);
+		nk_spacing(ctx, 1);
+		
+		nk_layout_row_push(ctx, 50);
+		if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_DIR), ""))
+		{
+			display_interface = -1;
+		}
+		
+		nk_layout_row_push(ctx, width * 0.35f);
+		if (g_title_font)
+		{
+			nk_gdip_set_font(g_title_font);
+			nk_label(ctx, u8"系统监控仪表盘", NK_TEXT_CENTERED);
+			nk_gdip_set_font(g_font);
+		}
+		else
+		{
+			nk_label(ctx, u8"系统监控仪表盘", NK_TEXT_CENTERED);
+		}
+		
+		nk_layout_row_push(ctx, width * 0.15f);
+		if (nk_button_label(ctx, u8"详细信息"))
+		{
+			display_interface = 0;
+		}
+		
+		nk_layout_row_push(ctx, width * 0.15f);
+		nk_spacing(ctx, 1);
+	}
+	nk_layout_row_end(ctx);
+	
+	nk_layout_row(ctx, NK_STATIC, content_height * 0.35f, 1, (float[1]) { width });
+	nk_spacing(ctx, 1);
+}
+
 VOID
 gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 {
@@ -1804,7 +1884,7 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 	}
 	if (!nk_begin_ex(ctx, u8"工控机哨兵",
 		nk_rect(0, 0, width, height),
-		g_bginfo ? NK_WINDOW_BACKGROUND : (NK_WINDOW_BACKGROUND | NK_WINDOW_CLOSABLE | NK_WINDOW_TITLE),
+		g_bginfo ? (NK_WINDOW_BACKGROUND | NK_WINDOW_NO_SCROLLBAR) : (NK_WINDOW_BACKGROUND | NK_WINDOW_CLOSABLE | NK_WINDOW_TITLE | NK_WINDOW_NO_SCROLLBAR),
 		nk_image_id(0), GET_PNG(IDR_PNG_CLOSE)))
 	{
 		nk_end(ctx);
@@ -1815,10 +1895,17 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 		return;
 	}
 
-	nk_layout_row_begin(ctx, NK_DYNAMIC, 30, 6);
+	if (display_interface == -1)
+	{
+		draw_startup_screen(ctx, width, height);
+		nk_end(ctx);
+		return;
+	}
+
+	nk_layout_row_begin(ctx, NK_DYNAMIC, 50, 7);
 
 	struct nk_rect rect = nk_layout_widget_bounds(ctx);
-	float button_ratio = 30.0f / rect.w;
+	float button_ratio = 50.0f / rect.w;
 	g_ctx.gui_ratio = 20.0f / rect.w;
 
 	nk_layout_row_push(ctx, button_ratio);
@@ -1844,13 +1931,17 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 	nk_layout_row_push(ctx, button_ratio);
 	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_PC), u8"蓝屏记录"))
 		display_interface = 2;
+	nk_layout_row_push(ctx, button_ratio);
+	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_DIR), u8"返回首页"))
+		display_interface = -1;
 	nk_layout_row_push(ctx, g_ctx.gui_ratio);
-	// if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_CLOSE), N_(N__CLOSE)))
-	// 	InterlockedExchange(&g_ctx.exit_pending, 1);
 	nk_layout_row_end(ctx);
 
-	if (display_interface == 1)
-	{
+	float content_height = height - 50 - g_ctx.gui_title - 10;
+	nk_layout_row(ctx, NK_STATIC, content_height, 1, (float[1]) { width });
+	if (nk_group_begin(ctx, "main_content", 0)) {
+		if (display_interface == 1)
+		{
 		gnwinfo_load_smart_history();
 		int csv_count = gnwinfo_get_smart_history_count();
 		
@@ -2019,6 +2110,7 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 			nk_lhcf(ctx, NK_TEXT_LEFT, g_color_text_d, u8"检测到 %d 条蓝屏记录", bsod_count);
 			
 			nk_layout_row(ctx, NK_DYNAMIC, 10, 1, (float[1]) { 1.0f });
+			draw_group_separator(ctx);
 			
 			for (int i = 0; i < bsod_count; i++) {
 				const BSOD_RECORD* record = gnwinfo_bsod_get_record(i);
@@ -2069,6 +2161,7 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 				}
 				
 				nk_layout_row(ctx, NK_DYNAMIC, 10, 1, (float[1]) { 1.0f });
+				draw_group_separator(ctx);
 			}
 		}
 		goto out;
@@ -2137,6 +2230,8 @@ out:
 				g_ctx.disk, g_ctx.spd, g_ctx.edid, g_ctx.cpuid, g_ctx.pci);
 			g_hw_has_diff = nk_false;
 		}
+	}
+		nk_group_end(ctx);
 	}
 	nk_end(ctx);
 }
