@@ -210,6 +210,7 @@
     <ClCompile Include="smart.c" />
     <ClCompile Include="smart_history.c" />
     <ClCompile Include="bsod.c" />
+    <ClCompile Include="customize.c" />
     <ClCompile Include="style.c" />
     <ClCompile Include="summary.c" />
     <ClCompile Include="utils.c" />
@@ -224,6 +225,7 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="..\docs\images\icon.ico" />
+    <Image Include="icons\basic.png" />
     <Image Include="icons\battery.png" />
     <Image Include="icons\battery1.png" />
     <Image Include="icons\cd.png" />
@@ -231,6 +233,7 @@
     <Image Include="icons\computer.png" />
     <Image Include="icons\cpu.png" />
     <Image Include="icons\cpuid.png" />
+    <Image Include="icons\deep.png" />
     <Image Include="icons\details.png" />
     <Image Include="icons\dir.png" />
     <Image Include="icons\disk.png" />
@@ -245,6 +248,7 @@
     <Image Include="icons\mm.png" />
     <Image Include="icons\monitor.png" />
     <Image Include="icons\network.png" />
+    <Image Include="icons\optimize.png" />
     <Image Include="icons\os.png" />
     <Image Include="icons\pc.png" />
     <Image Include="icons\pci.png" />

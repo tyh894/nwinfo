@@ -11,7 +11,7 @@ static int g_group_index = 0;
 
 static struct nk_color g_color_separator = { 0xC0, 0xC0, 0xC0, 0xFF };
 
-static VOID
+VOID
 run_powershell_script(LPCSTR script_name_with_args)
 {
 	char exe_path[MAX_PATH];
@@ -2167,7 +2167,7 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_PC), u8"蓝屏记录"))
 		display_interface = 2;
 	nk_layout_row_push(ctx, button_ratio);
-	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_PC), u8"系统优化"))
+	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_OPTIMIZE), u8"系统优化"))
 		display_interface = 3;
 	nk_layout_row_push(ctx, button_ratio);
 	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_COMPUTER), u8"返回首页"))
@@ -2412,33 +2412,34 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 		nk_lhc(ctx, u8"优化选项:", NK_TEXT_LEFT, g_color_text_l);
 		
 		nk_layout_row(ctx, NK_STATIC, 10, 1, (float[1]) { width });
-		nk_layout_row_begin(ctx, NK_DYNAMIC, width*0.2f, 2);
+		nk_layout_row_begin(ctx, NK_DYNAMIC, width*0.2f, 3);
 		nk_layout_row_push(ctx, 0.2f);
-		if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_CPU), u8"基础优化"))
+		if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_BASIC), u8"基础优化"))
 		{
 			run_powershell_script("run-optimize.ps1 -Level basic");
 		}
 		nk_layout_row_push(ctx, 0.2f);
-		if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_ROCKET), u8"深度优化"))
+		if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_DEEP), u8"深度优化"))
 		{
 			run_powershell_script("run-optimize.ps1 -Level deep");
+		}
+		nk_layout_row_push(ctx, 0.2f);
+		if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_FULL), u8"完全优化设置"))
+		{
+			run_powershell_script("run-optimize.ps1 -Level full");
 		}
 		nk_layout_row_end(ctx);
 		
 		nk_layout_row(ctx, NK_STATIC, 10, 1, (float[1]) { width });
-		nk_layout_row_begin(ctx, NK_DYNAMIC, width*0.2f, 3);
+		nk_layout_row_begin(ctx, NK_DYNAMIC, width*0.2f, 2);
+		
 		nk_layout_row_push(ctx, 0.2f);
-		if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_SETTINGS), u8"完全优化设置"))
+		if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_CUSTOMIZE), u8"深度定制"))
 		{
-			run_powershell_script("run-optimize.ps1 -Level full");
+			g_ctx.window_flag |= GUI_WINDOW_CUSTOMIZE;
 		}
 		nk_layout_row_push(ctx, 0.2f);
-		if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_PC), u8"深度定制"))
-		{
-			run_powershell_script("menu.ps1");
-		}
-		nk_layout_row_push(ctx, 0.2f);
-		if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_MEMORY), u8"取消优化设置"))
+		if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_CANCEL), u8"取消优化设置"))
 		{
 			run_powershell_script("undo-optimize.ps1");
 		}

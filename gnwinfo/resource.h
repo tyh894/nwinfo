@@ -35,9 +35,14 @@
 #define BLUE_SCREEN                     138   
 #define IDR_PNG_COMPUTER                139 
 #define IDR_PNG_DETAILS                 140
+#define IDR_PNG_BASIC                   141
+#define IDR_PNG_DEEP                    142
+#define IDR_PNG_FULL                    143
+#define IDR_PNG_CUSTOMIZE               144
+#define IDR_PNG_CANCEL                  145
+#define IDR_PNG_OPTIMIZE                146
 
-
-#define IDR_PNG_MAX                     141
+#define IDR_PNG_MAX                     148
 
 #define IDT_TIMER_1S                    (1u << 0)
 #define IDT_TIMER_1M                    (1u << 1)

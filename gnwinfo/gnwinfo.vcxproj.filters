@@ -140,6 +140,9 @@
     <ClCompile Include="bsod.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="customize.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="gnwinfo.rc">
@@ -238,6 +241,15 @@
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="icons\details.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="icons\basic.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="icons\deep.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="icons\optimize.png">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>
