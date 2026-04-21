@@ -652,7 +652,6 @@ LPCWSTR gnwinfo_hw_compare_get_path(void)
 {
 	return g_hw_json_path;
 }
-
 nk_bool gnwinfo_hw_compare_check_changes(void)
 {
 	if (!g_hw_json)
@@ -663,41 +662,34 @@ nk_bool gnwinfo_hw_compare_check_changes(void)
 
 	nk_bool has_changes = nk_false;
 
-	cJSON* json = g_hw_json;
-
-	cJSON* cpu = cJSON_GetObjectItem(json, "CPUID");
-	INT current_cpu_count = NWL_NodeChildCount(g_ctx.cpuid);
-	INT saved_cpu_count = cpu ? cJSON_GetArraySize(cpu) : 0;
+	INT current_cpu_count = g_ctx.cpuid ? NWL_NodeChildCount(g_ctx.cpuid) : 0;
+	INT saved_cpu_count = gnwinfo_hw_compare_get_array_size("CPUID", NULL);
 	printf("DEBUG: CPU count - current: %d, saved: %d\n", current_cpu_count, saved_cpu_count);
-	if (current_cpu_count != saved_cpu_count)
+	if (current_cpu_count > 0 && saved_cpu_count > 0 && current_cpu_count != saved_cpu_count)
 		has_changes = nk_true;
 
-	cJSON* memory = cJSON_GetObjectItem(json, "SPD");
-	INT current_memory_count = NWL_NodeChildCount(g_ctx.spd);
-	INT saved_memory_count = memory ? cJSON_GetArraySize(memory) : 0;
+	INT current_memory_count = g_ctx.spd ? NWL_NodeChildCount(g_ctx.spd) : 0;
+	INT saved_memory_count = gnwinfo_hw_compare_get_array_size("SPD", NULL);
 	printf("DEBUG: Memory count - current: %d, saved: %d\n", current_memory_count, saved_memory_count);
-	if (current_memory_count != saved_memory_count)
+	if (current_memory_count > 0 && saved_memory_count > 0 && current_memory_count != saved_memory_count)
 		has_changes = nk_true;
 
-	cJSON* disks = cJSON_GetObjectItem(json, "Disks");
-	INT current_disk_count = NWL_NodeChildCount(g_ctx.disk);
-	INT saved_disk_count = disks ? cJSON_GetArraySize(disks) : 0;
+	INT current_disk_count = g_ctx.disk ? NWL_NodeChildCount(g_ctx.disk) : 0;
+	INT saved_disk_count = gnwinfo_hw_compare_get_array_size("Disks", NULL);
 	printf("DEBUG: Disk count - current: %d, saved: %d\n", current_disk_count, saved_disk_count);
-	if (current_disk_count != saved_disk_count)
+	if (current_disk_count > 0 && saved_disk_count > 0 && current_disk_count != saved_disk_count)
 		has_changes = nk_true;
 
-	cJSON* displays = cJSON_GetObjectItem(json, "Display");
-	INT current_display_count = NWL_NodeChildCount(g_ctx.edid);
-	INT saved_display_count = displays ? cJSON_GetArraySize(displays) : 0;
+	INT current_display_count = g_ctx.edid ? NWL_NodeChildCount(g_ctx.edid) : 0;
+	INT saved_display_count = gnwinfo_hw_compare_get_array_size("Display", NULL);
 	printf("DEBUG: Display count - current: %d, saved: %d\n", current_display_count, saved_display_count);
-	if (current_display_count != saved_display_count)
+	if (current_display_count > 0 && saved_display_count > 0 && current_display_count != saved_display_count)
 		has_changes = nk_true;
 
-	cJSON* pci = cJSON_GetObjectItem(json, "PCI");
-	INT current_pci_count = NWL_NodeChildCount(g_ctx.pci);
-	INT saved_pci_count = pci ? cJSON_GetArraySize(pci) : 0;
+	INT current_pci_count = g_ctx.pci ? NWL_NodeChildCount(g_ctx.pci) : 0;
+	INT saved_pci_count = gnwinfo_hw_compare_get_array_size("PCI", NULL);
 	printf("DEBUG: PCI count - current: %d, saved: %d\n", current_pci_count, saved_pci_count);
-	if (current_pci_count != saved_pci_count)
+	if (current_pci_count > 0 && saved_pci_count > 0 && current_pci_count != saved_pci_count)
 		has_changes = nk_true;
 
 	printf("DEBUG: Has changes: %s\n", has_changes ? "YES" : "NO");

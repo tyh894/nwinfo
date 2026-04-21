@@ -11,6 +11,47 @@ static int g_group_index = 0;
 
 static struct nk_color g_color_separator = { 0xC0, 0xC0, 0xC0, 0xFF };
 
+static VOID
+run_powershell_script(LPCSTR script_name_with_args)
+{
+	char exe_path[MAX_PATH];
+	char full_script_path[MAX_PATH];
+	char cmd_line[MAX_PATH * 2];
+	char backup_dir[MAX_PATH];
+	
+	GetModuleFileNameA(NULL, exe_path, MAX_PATH);
+	char* last_backslash = strrchr(exe_path, '\\');
+	if (last_backslash) *last_backslash = '\0';
+	
+	if (GetEnvironmentVariableA("USERPROFILE", backup_dir, MAX_PATH) > 0) {
+		strcat_s(backup_dir, MAX_PATH, "\\herosys_data\\backup");
+	} else {
+		sprintf_s(backup_dir, MAX_PATH, "%s\\herosys_data\\backup", exe_path);
+	}
+	
+	if (strchr(script_name_with_args, ' ')) {
+		char script_name[MAX_PATH];
+		char* args = strchr(script_name_with_args, ' ');
+		size_t name_len = args - script_name_with_args;
+		strncpy_s(script_name, MAX_PATH, script_name_with_args, name_len);
+		script_name[name_len] = '\0';
+		args++;
+		
+		sprintf_s(full_script_path, MAX_PATH, "%s\\ICP-Optimizer\\%s", exe_path, script_name);
+		sprintf_s(cmd_line, MAX_PATH * 2, 
+			"-ExecutionPolicy Bypass -NoProfile -File \"%s\" %s -BackupDir \"%s\"", 
+			full_script_path, args, backup_dir);
+		ShellExecuteA(NULL, "open", "powershell.exe", cmd_line, NULL, SW_SHOWNORMAL);
+	} else {
+		sprintf_s(full_script_path, MAX_PATH, "%s\\ICP-Optimizer\\%s", 
+			exe_path, script_name_with_args);
+		sprintf_s(cmd_line, MAX_PATH * 2, 
+			"-ExecutionPolicy Bypass -NoProfile -File \"%s\" -BackupDir \"%s\"", 
+			full_script_path, backup_dir);
+		ShellExecuteA(NULL, "open", "powershell.exe", cmd_line, NULL, SW_SHOWNORMAL);
+	}
+}
+
 static void
 draw_group_separator(struct nk_context* ctx)
 {
@@ -1925,6 +1966,7 @@ draw_audio(struct nk_context* ctx)
 static int display_interface = -1;
 static int last_display_interface = -2;
 static GdipFont* g_title_font = NULL;
+static GdipFont* g_button_font = NULL;
 
 int gnwinfo_get_display_interface(void)
 {
@@ -1945,6 +1987,7 @@ draw_startup_screen(struct nk_context* ctx, float width, float height)
 		if (wcscmp(font_name, L"-") == 0)
 			wcscpy_s(font_name, 64, L"Microsoft YaHei");
 		g_title_font = nk_gdip_load_font(font_name, (int)(22 * g_dpi_factor));
+		g_button_font = nk_gdip_load_font(font_name, (int)(20 * g_dpi_factor));
 	}
 	
 	nk_layout_row(ctx, NK_STATIC, content_height * 0.1f, 1, (float[1]) { width });
@@ -1973,10 +2016,20 @@ draw_startup_screen(struct nk_context* ctx, float width, float height)
 			nk_label(ctx, u8"系统监控仪表盘", NK_TEXT_CENTERED);
 		}
 		
-		nk_layout_row_push(ctx, width * 0.15f);
-		if (nk_button_label(ctx, u8"详细信息"))
+		nk_layout_row_push(ctx, width * 0.22f);
 		{
-			display_interface = 0;
+			struct nk_style_button btn = ctx->style.button;
+			btn.rounding = 8.0f;
+			btn.border = 1.0f;
+			btn.padding = nk_vec2(8.0f, 8.0f);
+			btn.text_alignment = NK_TEXT_CENTERED;
+			if (g_button_font) {
+				nk_gdip_set_font(g_button_font);
+			}
+			if (nk_button_label_styled(ctx, &btn, u8"详细信息")) {
+				display_interface = 0;
+			}
+			nk_gdip_set_font(g_font);
 		}
 		
 		nk_layout_row_push(ctx, width * 0.15f);
@@ -1989,6 +2042,20 @@ draw_startup_screen(struct nk_context* ctx, float width, float height)
 	nk_layout_row(ctx, NK_STATIC, startup_content_height, 1, (float[1]) { width });
 	if (nk_group_begin(ctx, "startup_content", 0))
 	{
+		nk_layout_row(ctx, NK_STATIC, 30, 1, (float[1]) { width });
+		nk_layout_row_begin(ctx, NK_STATIC, 30, 1);
+		{
+			nk_layout_row_push(ctx, width);
+			nk_bool has_changes = gnwinfo_hw_compare_check_changes();
+			if (has_changes) {
+				nk_lhc(ctx, u8"系统配置有变更", NK_TEXT_LEFT, g_color_warning);
+			} else {
+				nk_lhc(ctx, u8"系统配置未变更", NK_TEXT_LEFT, g_color_text_d);
+			}
+		}
+		nk_layout_row_end(ctx);
+		draw_group_separator(ctx);
+		
 		draw_processor_simple(ctx);
 		draw_group_separator(ctx);
 		nk_layout_row(ctx, NK_STATIC, 10, 1, (float[1]) { width });
@@ -2100,8 +2167,12 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_PC), u8"蓝屏记录"))
 		display_interface = 2;
 	nk_layout_row_push(ctx, button_ratio);
+	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_PC), u8"系统优化"))
+		display_interface = 3;
+	nk_layout_row_push(ctx, button_ratio);
 	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_COMPUTER), u8"返回首页"))
 		display_interface = -1;
+	
 	nk_layout_row_push(ctx, g_ctx.gui_ratio);
 	nk_layout_row_end(ctx);
 
@@ -2332,6 +2403,47 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 				draw_group_separator(ctx);
 			}
 		}
+		goto out;
+	}
+
+	if (display_interface == 3)
+	{
+		nk_layout_row(ctx, NK_STATIC, 30, 1, (float[1]) { width });
+		nk_lhc(ctx, u8"优化选项:", NK_TEXT_LEFT, g_color_text_l);
+		
+		nk_layout_row(ctx, NK_STATIC, 10, 1, (float[1]) { width });
+		nk_layout_row_begin(ctx, NK_DYNAMIC, width*0.2f, 2);
+		nk_layout_row_push(ctx, 0.2f);
+		if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_CPU), u8"基础优化"))
+		{
+			run_powershell_script("run-optimize.ps1 -Level basic");
+		}
+		nk_layout_row_push(ctx, 0.2f);
+		if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_ROCKET), u8"深度优化"))
+		{
+			run_powershell_script("run-optimize.ps1 -Level deep");
+		}
+		nk_layout_row_end(ctx);
+		
+		nk_layout_row(ctx, NK_STATIC, 10, 1, (float[1]) { width });
+		nk_layout_row_begin(ctx, NK_DYNAMIC, width*0.2f, 3);
+		nk_layout_row_push(ctx, 0.2f);
+		if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_SETTINGS), u8"完全优化设置"))
+		{
+			run_powershell_script("run-optimize.ps1 -Level full");
+		}
+		nk_layout_row_push(ctx, 0.2f);
+		if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_PC), u8"深度定制"))
+		{
+			run_powershell_script("menu.ps1");
+		}
+		nk_layout_row_push(ctx, 0.2f);
+		if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_MEMORY), u8"取消优化设置"))
+		{
+			run_powershell_script("undo-optimize.ps1");
+		}
+		nk_layout_row_end(ctx);
+		
 		goto out;
 	}
 

@@ -231,6 +231,7 @@
     <Image Include="icons\computer.png" />
     <Image Include="icons\cpu.png" />
     <Image Include="icons\cpuid.png" />
+    <Image Include="icons\details.png" />
     <Image Include="icons\dir.png" />
     <Image Include="icons\disk.png" />
     <Image Include="icons\display.png" />

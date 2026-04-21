@@ -237,6 +237,9 @@
     <Image Include="icons\computer.png">
       <Filter>Resource Files</Filter>
     </Image>
+    <Image Include="icons\details.png">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="gnwinfo.ini" />
