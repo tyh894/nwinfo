@@ -857,8 +857,16 @@ wWinMain(_In_ HINSTANCE hInstance,
 	PathCchAppend(g_ini_path, MAX_PATH, L"gnwinfo.ini");
 	x_pos = strtol(gnwinfo_get_ini_value(L"Window", L"X", L"100"), NULL, 10);
 	y_pos = strtol(gnwinfo_get_ini_value(L"Window", L"Y", L"10"), NULL, 10);
-	g_init_width =  strtoul(gnwinfo_get_ini_value(L"Window", L"Width", L"1000"), NULL, 10);
-	g_init_height = strtoul(gnwinfo_get_ini_value(L"Window", L"Height", L"700"), NULL, 10);
+	{
+		int screen_width = GetSystemMetrics(SM_CXSCREEN);
+		int screen_height = GetSystemMetrics(SM_CYSCREEN);
+		g_init_width = (unsigned int)(screen_width * 0.52f);
+		g_init_height = (unsigned int)(screen_height * 0.65f);
+		if (g_init_width < 600) g_init_width = 600;
+		if (g_init_height < 500) g_init_height = 500;
+		if (g_init_width > (unsigned int)(screen_width - 100)) g_init_width = screen_width - 100;
+		if (g_init_height > (unsigned int)(screen_height - 100)) g_init_height = screen_height - 100;
+	}
 	g_init_alpha = strtoul(gnwinfo_get_ini_value(L"Window", L"Alpha", L"255"), NULL, 10);
 	g_smart_interval = strtoul(gnwinfo_get_ini_value(L"Window", L"SmartInterval", L"600"), NULL, 10);
 	if (g_smart_interval < 60) g_smart_interval = 60;
@@ -990,8 +998,8 @@ wWinMain(_In_ HINSTANCE hInstance,
 			{
 				int startup_width = (int)(500 * g_dpi_factor);
 				int startup_height = (int)(600 * g_dpi_factor);
-				SetWindowPos(wnd, NULL, 0, 0, startup_width, startup_height, SWP_NOMOVE | SWP_NOZORDER);
-				nk_gdip_resize(startup_width, startup_height);
+				SetWindowPos(wnd, NULL, 0, 0, g_init_width, g_init_height, SWP_NOMOVE | SWP_NOZORDER);
+				nk_gdip_resize(g_init_width, g_init_height);
 			}
 			else if (current_interface == 0 || current_interface == 1 || current_interface == 2)
 			{

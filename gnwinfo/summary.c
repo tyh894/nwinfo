@@ -2,6 +2,8 @@
 
 #include <windows.h>
 #include <shellapi.h>
+#include <stdio.h>
+#include <string.h>
 #include "gnwinfo.h"
 #include "gettext.h"
 #include "utils.h"
@@ -95,6 +97,56 @@ static const char* translate_health_status(const char* health)
 		strcpy_s(result, sizeof(result), cn_status);
 	}
 	
+	return result;
+}
+
+static const char* get_optimization_status()
+{
+	static char result[64] = {0};
+	char history_path[MAX_PATH];
+	char user_profile[MAX_PATH];
+	FILE* fp = NULL;
+	char buffer[1024];
+	char* level_start = NULL;
+	
+	if (GetEnvironmentVariableA("USERPROFILE", user_profile, MAX_PATH) > 0) {
+		_snprintf_s(history_path, MAX_PATH, _TRUNCATE, "%s\\herosys_data\\backup\\history.json", user_profile);
+	} else {
+		return u8"未优化";
+	}
+	
+	if (fopen_s(&fp, history_path, "r") != 0) {
+		return u8"未优化";
+	}
+	
+	while (fgets(buffer, sizeof(buffer), fp) != NULL) {
+		level_start = strstr(buffer, "\"Level\"");
+		if (level_start != NULL) {
+			level_start = strchr(level_start, ':');
+			if (level_start != NULL) {
+				level_start++;
+				while (*level_start == ' ' || *level_start == '"') level_start++;
+				
+				result[0] = '\0';
+				if (strncmp(level_start, "basic", 5) == 0) {
+					strcpy_s(result, sizeof(result), u8"基础优化");
+				} else if (strncmp(level_start, "deep", 4) == 0) {
+					strcpy_s(result, sizeof(result), u8"深度优化");
+				} else if (strncmp(level_start, "full", 4) == 0) {
+					strcpy_s(result, sizeof(result), u8"完全优化");
+				} else if (strncmp(level_start, "custom", 6) == 0 || strncmp(level_start, "menu", 4) == 0) {
+					strcpy_s(result, sizeof(result), u8"自定义优化");
+				} else {
+					strcpy_s(result, sizeof(result), u8"已优化");
+				}
+			}
+		}
+	}
+	fclose(fp);
+	
+	if (result[0] == '\0') {
+		return u8"未优化";
+	}
 	return result;
 }
 
@@ -657,7 +709,7 @@ draw_processor(struct nk_context* ctx)
 		if (!(g_ctx.main_flag & MAIN_CPU_DETAIL))
 			continue;
 
-		nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - g_ctx.gui_ratio/2,g_ctx.gui_ratio });
+		nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.2f, 0.4f - g_ctx.gui_ratio/2, 0.4f - 0.05f,0.05f });
 		nk_spacer(ctx);
 
 		int len = snprintf(m_buf, MAX_PATH, "%s %s", NWL_NodeAttrGet(cpu, "Cores"), N_(N__CORES));
@@ -1990,12 +2042,12 @@ draw_startup_screen(struct nk_context* ctx, float width, float height)
 		g_button_font = nk_gdip_load_font(font_name, (int)(20 * g_dpi_factor));
 	}
 	
-	nk_layout_row(ctx, NK_STATIC, content_height * 0.1f, 1, (float[1]) { width });
+	nk_layout_row(ctx, NK_STATIC, content_height * 0.1f, 2, (float[2]) { width*0.5f, width*0.5f });
 	nk_spacing(ctx, 1);
 	
 	nk_layout_row_begin(ctx, NK_STATIC, 50, 5);
 	{
-		nk_layout_row_push(ctx, width * 0.25f);
+		nk_layout_row_push(ctx, width * 0.3f);
 		nk_spacing(ctx, 1);
 		
 		nk_layout_row_push(ctx, 50);
@@ -2004,7 +2056,7 @@ draw_startup_screen(struct nk_context* ctx, float width, float height)
 			display_interface = -1;
 		}
 		
-		nk_layout_row_push(ctx, width * 0.35f);
+		nk_layout_row_push(ctx, width * 0.2f);
 		if (g_title_font)
 		{
 			nk_gdip_set_font(g_title_font);
@@ -2016,7 +2068,7 @@ draw_startup_screen(struct nk_context* ctx, float width, float height)
 			nk_label(ctx, u8"系统监控仪表盘", NK_TEXT_CENTERED);
 		}
 		
-		nk_layout_row_push(ctx, width * 0.22f);
+		nk_layout_row_push(ctx, width * 0.2f);
 		{
 			struct nk_style_button btn = ctx->style.button;
 			btn.rounding = 8.0f;
@@ -2039,19 +2091,20 @@ draw_startup_screen(struct nk_context* ctx, float width, float height)
 	nk_layout_row_end(ctx);
 	
 	float startup_content_height = height - 50 - g_ctx.gui_title - 10;
-	nk_layout_row(ctx, NK_STATIC, startup_content_height, 1, (float[1]) { width });
+	nk_layout_row(ctx, NK_STATIC, startup_content_height, 3, (float[3]) { width*0.2f, width*0.6f, width*0.2f });
+	nk_spacing(ctx, 1);
 	if (nk_group_begin(ctx, "startup_content", 0))
 	{
 		nk_layout_row(ctx, NK_STATIC, 30, 1, (float[1]) { width });
 		nk_layout_row_begin(ctx, NK_STATIC, 30, 1);
 		{
 			nk_layout_row_push(ctx, width);
-			nk_bool has_changes = gnwinfo_hw_compare_check_changes();
-			if (has_changes) {
-				nk_lhc(ctx, u8"系统配置有变更", NK_TEXT_LEFT, g_color_warning);
-			} else {
-				nk_lhc(ctx, u8"系统配置未变更", NK_TEXT_LEFT, g_color_text_d);
-			}
+		nk_bool has_changes = gnwinfo_hw_compare_check_changes();
+		if (has_changes) {
+			nk_lhc(ctx, u8"系统配置有变更", NK_TEXT_LEFT, g_color_warning);
+		} else {
+			nk_lhc(ctx, u8"系统配置未变更", NK_TEXT_LEFT, g_color_text_d);
+		}
 		}
 		nk_layout_row_end(ctx);
 		draw_group_separator(ctx);
@@ -2060,12 +2113,12 @@ draw_startup_screen(struct nk_context* ctx, float width, float height)
 		draw_group_separator(ctx);
 		nk_layout_row(ctx, NK_STATIC, 10, 1, (float[1]) { width });
 		nk_spacing(ctx, 1);
-
+		
 		draw_memory_simple(ctx);
 		draw_group_separator(ctx);
 		nk_layout_row(ctx, NK_STATIC, 10, 1, (float[1]) { width });
 		nk_spacing(ctx, 1);
-
+		
 		draw_storage_simple(ctx);   
 		draw_group_separator(ctx);
 		nk_layout_row(ctx, NK_STATIC, 10, 1, (float[1]) { width });
@@ -2408,8 +2461,12 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 
 	if (display_interface == 3)
 	{
-		nk_layout_row(ctx, NK_STATIC, 30, 1, (float[1]) { width });
-		nk_lhc(ctx, u8"优化选项:", NK_TEXT_LEFT, g_color_text_l);
+		/*nk_layout_row(ctx, NK_STATIC, 30, 1, (float[1]) { width });
+		nk_lhc(ctx, u8"优化选项:", NK_TEXT_LEFT, g_color_text_l);*/
+		
+		nk_layout_row(ctx, NK_STATIC, 25, 1, (float[1]) { width });
+		nk_lhc(ctx, u8"当前状态: ", NK_TEXT_LEFT, g_color_text_l);
+		nk_lhc(ctx, get_optimization_status(), NK_TEXT_LEFT, g_color_good);
 		
 		nk_layout_row(ctx, NK_STATIC, 10, 1, (float[1]) { width });
 		nk_layout_row_begin(ctx, NK_DYNAMIC, width*0.2f, 3);
@@ -2441,7 +2498,7 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 		nk_layout_row_push(ctx, 0.2f);
 		if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_CANCEL), u8"取消优化设置"))
 		{
-			run_powershell_script("undo-optimize.ps1");
+			run_powershell_script("undo-optimize.ps1 -Level prev");
 		}
 		nk_layout_row_end(ctx);
 		

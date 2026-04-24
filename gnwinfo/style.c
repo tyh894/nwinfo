@@ -41,6 +41,7 @@ gnwinfo_set_style(struct nk_context* ctx)
 	ctx->style.window.scaler = nk_style_item_color(g_color_text_d);
 	ctx->style.window.fixed_background = nk_style_item_color(g_color_back);
 	ctx->style.window.min_row_height_padding = 2;
+	ctx->style.window.scrollbar_size = nk_vec2(16.0f, 16.0f);
 	ctx->style.window.header.normal = nk_style_item_color(back_p2);
 	ctx->style.window.header.hover = nk_style_item_color(back_p2);
 	ctx->style.window.header.active = nk_style_item_color(back_p2);
