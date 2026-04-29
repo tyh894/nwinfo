@@ -821,7 +821,7 @@ wWinMain(_In_ HINSTANCE hInstance,
 //2026.5.1  
 	SYSTEMTIME expireDate = { 0 };
 	expireDate.wYear = 2026;
-	expireDate.wMonth = 5;
+	expireDate.wMonth = 6;
 	expireDate.wDay = 1;
 	SYSTEMTIME currentTime = { 0 };
 	GetLocalTime(&currentTime);

@@ -227,12 +227,13 @@
     <Image Include="..\docs\images\icon.ico" />
     <Image Include="icons\basic.png" />
     <Image Include="icons\battery.png" />
-    <Image Include="icons\battery1.png" />
+    <Image Include="icons\cancel.png" />
     <Image Include="icons\cd.png" />
     <Image Include="icons\close.png" />
     <Image Include="icons\computer.png" />
     <Image Include="icons\cpu.png" />
     <Image Include="icons\cpuid.png" />
+    <Image Include="icons\customize.png" />
     <Image Include="icons\deep.png" />
     <Image Include="icons\details.png" />
     <Image Include="icons\dir.png" />
@@ -242,8 +243,10 @@
     <Image Include="icons\edit.png" />
     <Image Include="icons\eth.png" />
     <Image Include="icons\firmware.png" />
+    <Image Include="icons\full.png" />
     <Image Include="icons\gpu.png" />
     <Image Include="icons\info.png" />
+    <Image Include="icons\ipmi.png" />
     <Image Include="icons\memory.png" />
     <Image Include="icons\mm.png" />
     <Image Include="icons\monitor.png" />
@@ -257,6 +260,7 @@
     <Image Include="icons\sensor.png" />
     <Image Include="icons\settings.png" />
     <Image Include="icons\smart.png" />
+    <Image Include="icons\sound.png" />
     <Image Include="icons\wlan.png" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -41,6 +41,7 @@
 #define IDR_PNG_CUSTOMIZE               144
 #define IDR_PNG_CANCEL                  145
 #define IDR_PNG_OPTIMIZE                146
+#define IDR_PNG_IPMI                    147
 
 #define IDR_PNG_MAX                     148
 

@@ -14,6 +14,7 @@ static nk_bool opt_enable_mitigations = nk_true;
 static nk_bool opt_update_management = nk_true;
 static nk_bool opt_ps_hardening = nk_true;
 static nk_bool opt_defender_hardening = nk_true;
+static nk_bool opt_virus_resistance = nk_true;
 
 VOID
 gnwinfo_draw_customize_window(struct nk_context* ctx, float width, float height)
@@ -62,6 +63,21 @@ gnwinfo_draw_customize_window(struct nk_context* ctx, float width, float height)
 	nk_checkbox_label(ctx, u8"PowerShell加固", &opt_ps_hardening);
 	nk_layout_row_push(ctx, 0.5f);
 	nk_checkbox_label(ctx, u8"Defender加固", &opt_defender_hardening);
+
+	nk_layout_row_push(ctx, 0.5f);
+	{
+		struct nk_color saved_normal = ctx->style.checkbox.text_normal;
+		struct nk_color saved_hover = ctx->style.checkbox.text_hover;
+		struct nk_color saved_active = ctx->style.checkbox.text_active;
+		ctx->style.checkbox.text_normal = g_color_warning;
+		ctx->style.checkbox.text_hover = g_color_warning;
+		ctx->style.checkbox.text_active = g_color_warning;
+		nk_checkbox_label(ctx, u8"常见病毒抵制", &opt_virus_resistance);
+		ctx->style.checkbox.text_normal = saved_normal;
+		ctx->style.checkbox.text_hover = saved_hover;
+		ctx->style.checkbox.text_active = saved_active;
+	}
+	
 
 	nk_layout_row(ctx, NK_STATIC, 25, 1, (float[1]) { width*0.2f });
 	if (nk_button_label(ctx, u8"开始优化"))

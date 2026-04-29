@@ -113,7 +113,9 @@ gnwinfo_draw_settings_window(struct nk_context* ctx, float width, float height)
 	nk_checkbox_flags_label(ctx, N_(N__NETWORK), &g_ctx.main_flag, MAIN_INFO_NETWORK);
 	nk_spacer(ctx);
 	nk_checkbox_flags_label(ctx, N_(N__AUDIO), &g_ctx.main_flag, MAIN_INFO_AUDIO);
+	nk_checkbox_flags_label(ctx, u8"…¢»»", &g_ctx.main_flag, MAIN_INFO_HEAT_DISSIPATION);
 	nk_spacer(ctx);
+	
 
 	nk_layout_row_dynamic(ctx, 0, 1);
 	set_label(ctx, N_(N__OS));

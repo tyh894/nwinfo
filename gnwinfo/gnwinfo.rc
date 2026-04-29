@@ -86,6 +86,8 @@ IDR_PNG_FULL            RCDATA                   "icons\\full.png"
 IDR_PNG_CUSTOMIZE       RCDATA                   "icons\\customize.png"
 IDR_PNG_CANCEL          RCDATA                   "icons\\cancel.png"
 IDR_PNG_OPTIMIZE        RCDATA                   "icons\\optimize.png"
+IDR_PNG_IPMI            RCDATA                   "icons\\ipmi.png"
+
 /////////////////////////////////////////////////////////////////////////////
 //
 // Version

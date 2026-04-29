@@ -24,6 +24,7 @@
 #include <libnw.h>
 #include <network.h>
 #include <gpu/gpu.h>
+#include <sensor/sensors.h>
 
 #include "resource.h"
 
@@ -81,6 +82,7 @@ nk_block(struct nk_context* ctx, struct nk_color color, const char* str);
 #define MAIN_INFO_STORAGE   (1U << 6)
 #define MAIN_INFO_NETWORK   (1U << 7)
 #define MAIN_INFO_AUDIO     (1U << 8)
+#define MAIN_INFO_HEAT_DISSIPATION (1U << 9)
 
 #define MAIN_NO_QUICK       (1U << 15)
 #define MAIN_NET_INACTIVE   (1U << 16)
@@ -200,10 +202,14 @@ extern NOTIFYICONDATAW g_nid;
 
 #define NK_COLOR_YELLOW     {0xFF, 0xEA, 0x00, 0xFF}
 #define NK_COLOR_RED        {0xFF, 0x17, 0x44, 0xFF}
-#define NK_COLOR_GREEN      {0x00, 0xE6, 0x76, 0xFF}
+// #define NK_COLOR_GREEN      {0x16, 0xE6, 0x0C, 0xFF}
+#define NK_COLOR_GREEN      {16, 151, 9, 0xFF}
+
 #define NK_COLOR_CYAN       {0x03, 0xDA, 0xC6, 0xFF}
 #define NK_COLOR_BLUE       {0x29, 0x79, 0xFF, 0xFF}
-#define NK_COLOR_WHITE      {0xFF, 0xFF, 0xFF, 0xFF}
+// #define NK_COLOR_WHITE      {0xFF, 0xFF, 0xFF, 0xFF}
+#define NK_COLOR_WHITE      {0xF4, 0x43, 0x36, 0xFF}
+// F44336
 #define NK_COLOR_BLACK      {0x00, 0x00, 0x00, 0xFF}
 #define NK_COLOR_GRAY       {0x2E, 0x2E, 0x2E, 0xFF}
 #define NK_COLOR_LIGHT      {0xBF, 0xBF, 0xBF, 0xFF}
@@ -227,6 +233,7 @@ VOID gnwinfo_draw_smart_window(struct nk_context* ctx, float width, float height
 VOID gnwinfo_draw_settings_window(struct nk_context* ctx, float width, float height);
 VOID gnwinfo_draw_pci_window(struct nk_context* ctx, float width, float height);
 VOID draw_pci_simple(struct nk_context* ctx);
+ VOID draw_heat_dissipation(struct nk_context* ctx);
 VOID gnwinfo_draw_dmi_window(struct nk_context* ctx, float width, float height);
 VOID gnwinfo_draw_display_window(struct nk_context* ctx, float width, float height);
 VOID gnwinfo_draw_sensor_window(struct nk_context* ctx, float width, float height);

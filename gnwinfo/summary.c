@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <shellapi.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "gnwinfo.h"
 #include "gettext.h"
@@ -12,6 +13,214 @@ static CHAR m_buf[MAX_PATH];
 static int g_group_index = 0;
 
 static struct nk_color g_color_separator = { 0xC0, 0xC0, 0xC0, 0xFF };
+
+static double get_fan_speed_from_sensors(const char* fan_name_prefix)
+{
+	PNODE parent = NWL_NodeAlloc("temp_sensors", 0);
+	if (!parent)
+		return -1.0;
+
+	NWL_InitSensors(NWL_SENSOR_HWINFO);
+	PNODE sensors = NWL_GetSensors(parent);
+	if (!sensors)
+	{
+		NWL_NodeFree(parent, 1);
+		return -1.0;
+	}
+
+	double fan_speed = -1.0;
+	int sensor_count = NWL_NodeChildCount(sensors);
+	for (int i = 0; i < sensor_count; i++)
+	{
+		PNODE sensor = NWL_NodeEnumChild(sensors, i);
+		if (!sensor)
+			continue;
+
+		int attr_count = NWL_NodeAttrCount(sensor);
+		for (int j = 0; j < attr_count; j++)
+		{
+			PNODE_ATT att = NWL_NodeAttrEnum(sensor, j);
+			if (!att || !att->key || !att->value)
+				continue;
+
+			if (strstr(att->key, fan_name_prefix) && strstr(att->key, "Fan"))
+			{
+				fan_speed = atof(att->value);
+				if (fan_speed > 0)
+					break;
+			}
+		}
+		if (fan_speed > 0)
+			break;
+	}
+
+	NWL_NodeFree(parent, 1);
+	return fan_speed;
+}
+
+static int g_mem_test_running = 0;
+static int g_mem_test_result = -1;
+static DWORD64 g_mem_test_size = 0;
+static HANDLE g_mem_test_thread = NULL;
+static char g_mem_test_time[128] = { 0 };
+static int g_mem_test_loaded = 0;
+static int g_cpu_test_result = -1;
+static char g_cpu_test_time[128] = { 0 };
+static int g_cpu_test_loaded = 0;
+
+#define BLOCK_SIZE (64 * 1024 * 1024)
+#define TEST_PATTERNS 4
+
+static void load_mem_test_result(void)
+{
+	FILE* fp;
+	char path[MAX_PATH];
+	char backup_dir[MAX_PATH];
+	char line[256];
+	
+	if (GetEnvironmentVariableA("USERPROFILE", backup_dir, MAX_PATH) > 0) {
+		sprintf_s(path, MAX_PATH, "%s\\herosys_data\\backup\\mem_test_result.txt", backup_dir);
+	} else {
+		return;
+	}
+	
+	fopen_s(&fp, path, "r");
+	if (fp)
+	{
+		if (fgets(line, sizeof(line), fp))
+		{
+			if (sscanf_s(line, "%d %lld %s", &g_mem_test_result, &g_mem_test_size, g_mem_test_time, (unsigned)_countof(g_mem_test_time)) == 3)
+			{
+			}
+		}
+		fclose(fp);
+	}
+}
+
+static void save_mem_test_result(int result, DWORD64 size)
+{
+	FILE* fp;
+	char path[MAX_PATH];
+	char backup_dir[MAX_PATH];
+	
+	if (GetEnvironmentVariableA("USERPROFILE", backup_dir, MAX_PATH) > 0) {
+		sprintf_s(path, MAX_PATH, "%s\\herosys_data\\backup\\mem_test_result.txt", backup_dir);
+	} else {
+		return;
+	}
+	
+	fopen_s(&fp, path, "w");
+	if (fp)
+	{
+		SYSTEMTIME st;
+		GetLocalTime(&st);
+		sprintf_s(g_mem_test_time, sizeof(g_mem_test_time), "%04d-%02d-%02d_%02d:%02d:%02d", 
+			st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+		fprintf(fp, "%d %lld %s\n", result, size, g_mem_test_time);
+		fclose(fp);
+	}
+}
+
+static int test_block(void* ptr, SIZE_T size)
+{
+	BYTE* p = (BYTE*)ptr;
+	BYTE pattern;
+
+	for (int pat = 0; pat < TEST_PATTERNS; pat++)
+	{
+		switch (pat)
+		{
+			case 0: pattern = 0x00; break;
+			case 1: pattern = 0xFF; break;
+			case 2: pattern = 0xAA; break;
+			case 3: pattern = 0x55; break;
+			default: pattern = 0x00;
+		}
+
+		memset(p, pattern, size);
+
+		for (SIZE_T i = 0; i < size; i++)
+		{
+			if (p[i] != pattern)
+			{
+				return 0;
+			}
+		}
+	}
+	return 1;
+}
+
+static DWORD WINAPI memory_test_thread(LPVOID param)
+{
+	MEMORYSTATUSEX memInfo;
+	memInfo.dwLength = sizeof(memInfo);
+	GlobalMemoryStatusEx(&memInfo);
+
+	SIZE_T totalMem = (SIZE_T)(memInfo.ullTotalPhys);
+	SIZE_T reserveMem = 512 * 1024 * 1024;
+	SIZE_T testMem = totalMem - reserveMem;
+	SIZE_T blocks = testMem / BLOCK_SIZE;
+
+	if (blocks < 1)
+		blocks = 1;
+
+	void** bufs = (void**)malloc(blocks * sizeof(void*));
+	if (!bufs)
+	{
+		g_mem_test_result = -1;
+		g_mem_test_running = 0;
+		return 0;
+	}
+
+	SIZE_T allocated_blocks = 0;
+	for (SIZE_T i = 0; i < blocks; i++)
+	{
+		bufs[i] = VirtualAlloc(NULL, BLOCK_SIZE, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+		if (!bufs[i])
+		{
+			break;
+		}
+		allocated_blocks++;
+	}
+
+	g_mem_test_size = blocks * BLOCK_SIZE;
+
+	DWORD errors = 0;
+
+	for (int pass = 1; pass <= 3; pass++)
+	{
+		for (SIZE_T i = 0; i < allocated_blocks; i++)
+		{
+			if (!test_block(bufs[i], BLOCK_SIZE))
+			{
+				errors++;
+			}
+		}
+	}
+
+	for (SIZE_T i = 0; i < allocated_blocks; i++)
+		VirtualFree(bufs[i], 0, MEM_RELEASE);
+
+	free(bufs);
+
+	g_mem_test_result = (int)errors;
+	g_mem_test_size = allocated_blocks * BLOCK_SIZE;
+	save_mem_test_result((int)errors, g_mem_test_size);
+	g_mem_test_running = 0;
+	return 0;
+}
+
+static void start_memory_test(void)
+{
+	if (g_mem_test_running)
+		return;
+
+	g_mem_test_running = 1;
+	g_mem_test_result = -1;
+	g_mem_test_thread = CreateThread(NULL, 0, memory_test_thread, NULL, 0, NULL);
+	if (g_mem_test_thread)
+		CloseHandle(g_mem_test_thread);
+}
 
 VOID
 run_powershell_script(LPCSTR script_name_with_args)
@@ -794,10 +1003,11 @@ draw_processor_simple(struct nk_context* ctx)
 	LPCSTR cores = cpu ? NWL_NodeAttrGet(cpu, "Cores") : "-";
 	LPCSTR threads = cpu ? NWL_NodeAttrGet(cpu, "Logical CPUs") : "-";
 	
-	nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.5f, 0.5f });
+	nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.4f, 0.4f, 0.2f });
 	nk_image_label(ctx, GET_PNG(IDR_PNG_CPU), u8"CPU 使用率", NK_TEXT_LEFT, g_color_text_d);
 	nk_lhcf(ctx, NK_TEXT_LEFT, gnwinfo_get_color(g_ctx.cpu_usage, 70.0, 90.0),
 		"%.1f%%", g_ctx.cpu_usage);
+	nk_lhc(ctx, u8"● 正常", NK_TEXT_LEFT, g_color_good);
 	
 	nk_layout_row(ctx, NK_DYNAMIC, 0, 1, (float[1]) { 1.0f });
 	gnwinfo_draw_percent_prog(ctx, g_ctx.cpu_usage);
@@ -807,6 +1017,13 @@ draw_processor_simple(struct nk_context* ctx)
 	nk_lhc(ctx, m_buf, NK_TEXT_LEFT, g_color_text_l);
 	snprintf(m_buf, MAX_PATH, u8"频率：%lu MHz", g_ctx.cpu_freq);
 	nk_lhc(ctx, m_buf, NK_TEXT_LEFT, g_color_text_l);
+
+	nk_layout_row(ctx, NK_DYNAMIC, 35, 2, (float[2]) { 0.7f, 0.3f });
+	nk_lhc(ctx, u8"未测试", NK_TEXT_LEFT, g_color_text_l);
+	if (nk_button_label(ctx, u8"测试CPU"))
+	{
+
+	}
 }
 
 static VOID
@@ -1086,12 +1303,19 @@ draw_memory(struct nk_context* ctx)
 static VOID
 draw_memory_simple(struct nk_context* ctx)
 {
-	nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.5f, 0.5f });
-	nk_image_label(ctx, GET_PNG(IDR_PNG_MEMORY), u8"内存使用", NK_TEXT_LEFT, g_color_text_d);
+	if (!g_mem_test_loaded)
+	{
+		load_mem_test_result();
+		g_mem_test_loaded = 1;
+	}
+	
+	nk_layout_row(ctx, NK_DYNAMIC, 0, 3, (float[3]) { 0.4f, 0.4f, 0.2f });
+	nk_image_label(ctx, GET_PNG(IDR_PNG_MEMORY), u8"内存使用率", NK_TEXT_LEFT, g_color_text_d);
 	nk_lhcf(ctx, NK_TEXT_LEFT,
 		gnwinfo_get_color((double)g_ctx.mem_status.PhysUsage, 70.0, 90.0),
 		"%lu%%", g_ctx.mem_status.PhysUsage);
-	
+	nk_lhc(ctx, u8"● 正常", NK_TEXT_LEFT, g_color_good);
+		
 	nk_layout_row(ctx, NK_DYNAMIC, 0, 1, (float[1]) { 1.0f });
 	gnwinfo_draw_percent_prog(ctx, (double)g_ctx.mem_status.PhysUsage);
 	
@@ -1100,6 +1324,33 @@ draw_memory_simple(struct nk_context* ctx)
 	nk_lhc(ctx, m_buf, NK_TEXT_LEFT, g_color_text_l);
 	snprintf(m_buf, MAX_PATH, u8"总量：%s", g_ctx.mem_status.StrPhysTotal);
 	nk_lhc(ctx, m_buf, NK_TEXT_LEFT, g_color_text_l);
+
+	nk_layout_row(ctx, NK_DYNAMIC, 35, 2, (float[2]) { 0.7f, 0.3f });
+	if (g_mem_test_running)
+	{
+		nk_lhc(ctx, u8"测试中...", NK_TEXT_LEFT, g_color_warning);
+	}
+	else if (g_mem_test_result == 0)
+	{
+		snprintf(m_buf, MAX_PATH, u8"通过 (%lldMB) (%s)", g_mem_test_size / (1024 * 1024), g_mem_test_time);
+		for (char* p = m_buf; *p; p++) { if (*p == '_') *p = ' '; }
+		nk_lhc(ctx, m_buf, NK_TEXT_LEFT, g_color_good);
+	}
+	else if (g_mem_test_result > 0)
+	{
+		snprintf(m_buf, MAX_PATH, u8"错误: %d (%lldMB) (%s)", g_mem_test_result, g_mem_test_size / (1024 * 1024), g_mem_test_time);
+		for (char* p = m_buf; *p; p++) { if (*p == '_') *p = ' '; }
+		nk_lhc(ctx, m_buf, NK_TEXT_LEFT, g_color_warning);
+	}
+	else
+	{
+		nk_lhc(ctx, u8"未测试", NK_TEXT_LEFT, g_color_text_l);
+	}
+
+	if (nk_button_label(ctx, u8"测试内存"))
+	{
+		start_memory_test();
+	}
 }
 static VOID
 draw_display(struct nk_context* ctx)
@@ -1847,14 +2098,17 @@ draw_storage_simple(struct nk_context* ctx)
 			prefix = "HD";
 		}
 
-		nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.5f, 0.5f });
+		nk_layout_row(ctx, NK_DYNAMIC, 0, 4, (float[4]) { 0.3f, 0.2f,0.3f, 0.2f });
 		snprintf(m_buf, MAX_PATH, "%s%s %s%s",
 			prefix,
 			id,
 			NWL_NodeAttrGet(disk, "Type"),
 			ssd);
 		nk_lhsc(ctx, m_buf, NK_TEXT_LEFT, g_color_text_d, nk_true, nk_true);
-
+		nk_lhcf(ctx, NK_TEXT_LEFT,
+			g_color_text_l,
+			"%s",
+			NWL_NodeAttrGet(disk, "Size"));
 		LPCSTR health = NWL_NodeAttrGet(disk, "Health Status");
 		if ((g_ctx.main_flag & MAIN_DISK_SMART) && strcmp(health, "-") != 0)
 		{
@@ -1897,16 +2151,27 @@ draw_storage_simple(struct nk_context* ctx)
 		{
 			nk_spacing(ctx, 1);
 		}
+		nk_lhc(ctx, u8"● 正常", NK_TEXT_LEFT, g_color_good);
 
-		nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.1f, 0.9f });
+		
+
+		nk_layout_row(ctx, NK_DYNAMIC, 35, 3, (float[3]) { 0.05f, 0.65f,0.3f });
+		nk_spacer(ctx);
 		nk_spacer(ctx);
 
-		nk_lhcf(ctx, NK_TEXT_LEFT,
-			g_color_text_l,
-			"%s %s %s",
-			NWL_NodeAttrGet(disk, "Size"),
-			NWL_NodeAttrGet(disk, "Partition Table"),
-			NWL_NodeAttrGet(disk, "Product ID"));
+		// nk_lhcf(ctx, NK_TEXT_LEFT,
+		// 	g_color_text_l,
+		// 	"%s %s %s",
+		// 	NWL_NodeAttrGet(disk, "Size"),
+		// 	NWL_NodeAttrGet(disk, "Partition Table"),
+		// 	NWL_NodeAttrGet(disk, "Product ID"));
+		if (ssd[0] == '\0')
+		{
+			// nk_layout_row(ctx, NK_DYNAMIC, 30, 1, (float[1]) { 1.0f });
+			if (nk_button_label(ctx, u8"磁道电机性能检测"))
+			{
+			}
+		}
 	}
 
 	if (g_ctx.main_flag & MAIN_DISK_COMPACT)
@@ -2020,6 +2285,48 @@ static int last_display_interface = -2;
 static GdipFont* g_title_font = NULL;
 static GdipFont* g_button_font = NULL;
 
+ VOID
+ draw_heat_dissipation(struct nk_context* ctx)
+ {
+ 	nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 1.0f - g_ctx.gui_ratio, g_ctx.gui_ratio });
+ 	nk_image_label(ctx, GET_PNG(IDR_PNG_SENSOR), u8"散热信息", NK_TEXT_LEFT, g_color_text_d);
+ 	nk_spacer(ctx);
+
+ 	nk_layout_row(ctx, NK_DYNAMIC, 0, 5, (float[5]) { 0.2f, 0.2f, 0.2f, 0.2f, 0.2f });
+
+	 if (g_ctx.cpu_info && g_ctx.cpu_info[0].MsrTemp > 0)
+		snprintf(m_buf, MAX_PATH, u8"CPU温度: %d°C", g_ctx.cpu_info[0].MsrTemp);
+	 else
+	 	snprintf(m_buf, MAX_PATH, u8"CPU温度: --");
+	 nk_lhc(ctx, m_buf, NK_TEXT_LEFT, g_color_text_l);
+
+	 double cpu_fan = get_fan_speed_from_sensors("CPU");
+	 if (cpu_fan > 0)
+	 	snprintf(m_buf, MAX_PATH, u8"CPU风扇: %.0f RPM", cpu_fan);
+	 else
+	 	snprintf(m_buf, MAX_PATH, u8"CPU风扇: --");
+	 nk_lhc(ctx, m_buf, NK_TEXT_LEFT, g_color_text_l);
+
+	if (g_ctx.lib.NwGpu && g_ctx.lib.NwGpu->DeviceCount > 0 && g_ctx.lib.NwGpu->Device[0].Temperature > 0)
+		snprintf(m_buf, MAX_PATH, u8"显卡温度: %.1f°C", g_ctx.lib.NwGpu->Device[0].Temperature);
+	else
+		snprintf(m_buf, MAX_PATH, u8"显卡温度: --");
+	nk_lhc(ctx, m_buf, NK_TEXT_LEFT, g_color_text_l);
+
+	if (g_ctx.lib.NwGpu && g_ctx.lib.NwGpu->DeviceCount > 0 && g_ctx.lib.NwGpu->Device[0].FanSpeed > 0)
+		snprintf(m_buf, MAX_PATH, u8"显卡风扇: %llu RPM", g_ctx.lib.NwGpu->Device[0].FanSpeed);
+	else
+		snprintf(m_buf, MAX_PATH, u8"显卡风扇: --");
+	nk_lhc(ctx, m_buf, NK_TEXT_LEFT, g_color_text_l);
+
+	double chassis_fan = get_fan_speed_from_sensors("Chassis");
+	if (chassis_fan > 0)
+		snprintf(m_buf, MAX_PATH, u8"机箱风扇: %.0f RPM", chassis_fan);
+	else
+		snprintf(m_buf, MAX_PATH, u8"机箱风扇: --");
+	nk_lhc(ctx, m_buf, NK_TEXT_LEFT, g_color_text_l);
+ }
+
 int gnwinfo_get_display_interface(void)
 {
 	return display_interface;
@@ -2103,7 +2410,7 @@ draw_startup_screen(struct nk_context* ctx, float width, float height)
 		if (has_changes) {
 			nk_lhc(ctx, u8"系统配置有变更", NK_TEXT_LEFT, g_color_warning);
 		} else {
-			nk_lhc(ctx, u8"系统配置未变更", NK_TEXT_LEFT, g_color_text_d);
+			nk_lhc(ctx, u8"系统配置未变更", NK_TEXT_LEFT, g_color_good);
 		}
 		}
 		nk_layout_row_end(ctx);
@@ -2199,9 +2506,26 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 	nk_layout_row_push(ctx, button_ratio);
 	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_SENSOR), N_(N__SENSOR_VIEW)))
 		display_interface = 0;
+	
+	
+	
 	nk_layout_row_push(ctx, button_ratio);
-	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_SETTINGS), N_(N__SETTINGS)))
-		g_ctx.window_flag |= GUI_WINDOW_SETTINGS;
+	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_DISK), u8"硬盘信息"))
+		display_interface = 1;
+	nk_layout_row_push(ctx, button_ratio);
+	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_PC), u8"蓝屏记录"))
+		display_interface = 2;
+	nk_layout_row_push(ctx, button_ratio);
+	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_OPTIMIZE), u8"系统优化"))
+		display_interface = 3;
+	nk_layout_row_push(ctx, button_ratio);
+	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_IPMI), u8"IPMI"))
+	{	
+
+	}
+	nk_layout_row_push(ctx, button_ratio);
+	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_COMPUTER), u8"返回首页"))
+		display_interface = -1;
 	nk_layout_row_push(ctx, button_ratio);
 	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_REFRESH), N_(N__REFRESH)))
 	{
@@ -2213,19 +2537,11 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 	nk_layout_row_push(ctx, button_ratio);
 	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_INFO), N_(N__ABOUT)))
 		g_ctx.window_flag |= GUI_WINDOW_ABOUT;
-	nk_layout_row_push(ctx, button_ratio);
-	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_DISK), u8"硬盘信息"))
-		display_interface = 1;
-	nk_layout_row_push(ctx, button_ratio);
-	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_PC), u8"蓝屏记录"))
-		display_interface = 2;
-	nk_layout_row_push(ctx, button_ratio);
-	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_OPTIMIZE), u8"系统优化"))
-		display_interface = 3;
-	nk_layout_row_push(ctx, button_ratio);
-	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_COMPUTER), u8"返回首页"))
-		display_interface = -1;
+
 	
+	nk_layout_row_push(ctx, button_ratio);
+	if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_SETTINGS), N_(N__SETTINGS)))
+		g_ctx.window_flag |= GUI_WINDOW_SETTINGS;
 	nk_layout_row_push(ctx, g_ctx.gui_ratio);
 	nk_layout_row_end(ctx);
 
@@ -2461,44 +2777,133 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 
 	if (display_interface == 3)
 	{
-		/*nk_layout_row(ctx, NK_STATIC, 30, 1, (float[1]) { width });
-		nk_lhc(ctx, u8"优化选项:", NK_TEXT_LEFT, g_color_text_l);*/
-		
-		nk_layout_row(ctx, NK_STATIC, 25, 1, (float[1]) { width });
+		nk_layout_row(ctx, NK_STATIC, 25, 1, (float[1]) { 900 });
 		nk_lhc(ctx, u8"当前状态: ", NK_TEXT_LEFT, g_color_text_l);
 		nk_lhc(ctx, get_optimization_status(), NK_TEXT_LEFT, g_color_good);
 		
-		nk_layout_row(ctx, NK_STATIC, 10, 1, (float[1]) { width });
-		nk_layout_row_begin(ctx, NK_DYNAMIC, width*0.2f, 3);
-		nk_layout_row_push(ctx, 0.2f);
-		if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_BASIC), u8"基础优化"))
-		{
-			run_powershell_script("run-optimize.ps1 -Level basic");
-		}
-		nk_layout_row_push(ctx, 0.2f);
-		if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_DEEP), u8"深度优化"))
-		{
-			run_powershell_script("run-optimize.ps1 -Level deep");
-		}
-		nk_layout_row_push(ctx, 0.2f);
-		if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_FULL), u8"完全优化设置"))
-		{
-			run_powershell_script("run-optimize.ps1 -Level full");
-		}
-		nk_layout_row_end(ctx);
+		nk_layout_row(ctx, NK_STATIC, 10, 1, (float[1]) { 900 });
 		
-		nk_layout_row(ctx, NK_STATIC, 10, 1, (float[1]) { width });
-		nk_layout_row_begin(ctx, NK_DYNAMIC, width*0.2f, 2);
+		float panel_width = 180.0f;
+		float button_width = 160.0f;
 		
-		nk_layout_row_push(ctx, 0.2f);
-		if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_CUSTOMIZE), u8"深度定制"))
-		{
-			g_ctx.window_flag |= GUI_WINDOW_CUSTOMIZE;
+		nk_layout_row(ctx, NK_STATIC, 10, 1, (float[1]) { 900 });
+		nk_layout_row_begin(ctx, NK_STATIC, 450, 5);
+		nk_layout_row_push(ctx, panel_width);
+		if (nk_group_begin(ctx, "panel_basic", NK_WINDOW_BORDER | NK_WINDOW_NO_SCROLLBAR)) {
+			nk_layout_row(ctx, NK_STATIC, 25, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"基础优化", NK_TEXT_CENTERED, g_color_text_l);
+			nk_layout_row(ctx, NK_STATIC, 100, 2, (float[2]) { 40,100 });
+			nk_spacing(ctx, 1);
+			if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_BASIC), u8"基础优化")) {
+				run_powershell_script("run-optimize.ps1 -Level basic ");
+			}
+			nk_layout_row(ctx, NK_STATIC, 20, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"1. 禁用遥测", NK_TEXT_LEFT, g_color_text_d);
+			nk_layout_row(ctx, NK_STATIC, 20, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"2. 禁用隐私收集", NK_TEXT_LEFT, g_color_text_d);
+			nk_layout_row(ctx, NK_STATIC, 20, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"3. 移除预装软件", NK_TEXT_LEFT, g_color_text_d);
+			nk_layout_row(ctx, NK_STATIC, 20, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"4. 清除本地GPO", NK_TEXT_LEFT, g_color_text_d);
+			nk_group_end(ctx);
 		}
-		nk_layout_row_push(ctx, 0.2f);
-		if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_CANCEL), u8"取消优化设置"))
-		{
-			run_powershell_script("undo-optimize.ps1 -Level prev");
+		nk_layout_row_push(ctx, panel_width);
+		if (nk_group_begin(ctx, "panel_deep", NK_WINDOW_BORDER | NK_WINDOW_NO_SCROLLBAR)) {
+			nk_layout_row(ctx, NK_STATIC, 25, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"深度优化", NK_TEXT_CENTERED, g_color_text_l);
+			nk_layout_row(ctx, NK_STATIC, 100, 2, (float[2]) { 40, 100 });
+			nk_spacing(ctx, 1);
+			if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_DEEP), u8"深度优化")) {
+				run_powershell_script("run-optimize.ps1 -Level deep");
+			}
+			nk_layout_row(ctx, NK_STATIC, 18, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"1. 禁用遥测", NK_TEXT_LEFT, g_color_text_d);
+			nk_layout_row(ctx, NK_STATIC, 18, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"2. 禁用隐私收集", NK_TEXT_LEFT, g_color_text_d);
+			nk_layout_row(ctx, NK_STATIC, 18, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"3. 移除预装软件", NK_TEXT_LEFT, g_color_text_d);
+			nk_layout_row(ctx, NK_STATIC, 18, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"4. 清除本地GPO", NK_TEXT_LEFT, g_color_text_d);
+			nk_layout_row(ctx, NK_STATIC, 18, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"5. 启用防火墙", NK_TEXT_LEFT, g_color_text_d);
+			nk_layout_row(ctx, NK_STATIC, 18, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"6. 配置Defender", NK_TEXT_LEFT, g_color_text_d);
+			nk_layout_row(ctx, NK_STATIC, 18, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"7. 禁用SMBv1", NK_TEXT_LEFT, g_color_text_d);
+			nk_layout_row(ctx, NK_STATIC, 18, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"8. SSL/TLS加固", NK_TEXT_LEFT, g_color_text_d);
+			nk_layout_row(ctx, NK_STATIC, 18, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"9. 启用安全缓解", NK_TEXT_LEFT, g_color_text_d);
+			nk_layout_row(ctx, NK_STATIC, 18, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"10. 更新管理", NK_TEXT_LEFT, g_color_text_d);
+			nk_group_end(ctx);
+		}
+		nk_layout_row_push(ctx, panel_width);
+		if (nk_group_begin(ctx, "panel_full", NK_WINDOW_BORDER | NK_WINDOW_NO_SCROLLBAR)) {
+			nk_layout_row(ctx, NK_STATIC, 25, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"完全优化", NK_TEXT_CENTERED, g_color_text_l);
+			nk_layout_row(ctx, NK_STATIC, 100, 2, (float[2]) { 40, 100 });
+			nk_spacing(ctx, 1);
+			if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_FULL), u8"完全优化")) {
+				run_powershell_script("run-optimize.ps1 -Level full");
+			}
+			nk_layout_row(ctx, NK_STATIC, 18, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"1. 禁用遥测", NK_TEXT_LEFT, g_color_text_d);
+			nk_layout_row(ctx, NK_STATIC, 18, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"2. 禁用隐私收集", NK_TEXT_LEFT, g_color_text_d);
+			nk_layout_row(ctx, NK_STATIC, 18, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"3. 移除预装软件", NK_TEXT_LEFT, g_color_text_d);
+			nk_layout_row(ctx, NK_STATIC, 18, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"4. 清除本地GPO", NK_TEXT_LEFT, g_color_text_d);
+			nk_layout_row(ctx, NK_STATIC, 18, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"5. 启用防火墙", NK_TEXT_LEFT, g_color_text_d);
+			nk_layout_row(ctx, NK_STATIC, 18, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"6. 配置Defender", NK_TEXT_LEFT, g_color_text_d);
+			nk_layout_row(ctx, NK_STATIC, 18, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"7. 禁用SMBv1", NK_TEXT_LEFT, g_color_text_d);
+			nk_layout_row(ctx, NK_STATIC, 18, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"8. SSL/TLS加固", NK_TEXT_LEFT, g_color_text_d);
+			nk_layout_row(ctx, NK_STATIC, 18, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"9. 启用安全缓解", NK_TEXT_LEFT, g_color_text_d);
+			nk_layout_row(ctx, NK_STATIC, 18, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"10. 更新管理", NK_TEXT_LEFT, g_color_text_d);
+			nk_layout_row(ctx, NK_STATIC, 18, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"11. PowerShell加固", NK_TEXT_LEFT, g_color_text_d);
+			nk_layout_row(ctx, NK_STATIC, 18, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"12. Defender加固", NK_TEXT_LEFT, g_color_text_d);
+			nk_group_end(ctx);
+		}
+		nk_layout_row_push(ctx, panel_width);
+		if (nk_group_begin(ctx, "panel_customize", NK_WINDOW_BORDER | NK_WINDOW_NO_SCROLLBAR)) {
+			nk_layout_row(ctx, NK_STATIC, 30, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"深度定制", NK_TEXT_CENTERED, g_color_text_l);
+			nk_layout_row(ctx, NK_STATIC, 100, 2, (float[2]) { 40, 100 });
+			nk_spacing(ctx, 1);
+			if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_CUSTOMIZE), u8"深度定制")) {
+				g_ctx.window_flag |= GUI_WINDOW_CUSTOMIZE;
+			}
+			nk_layout_row(ctx, NK_STATIC, 30, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"自定义12项", NK_TEXT_LEFT, g_color_text_d);
+			nk_layout_row(ctx, NK_STATIC, 30, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"按需优化", NK_TEXT_LEFT, g_color_text_d);
+			nk_layout_row(ctx, NK_STATIC, 30, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"常见病毒抵制", NK_TEXT_LEFT, g_color_warning);
+			nk_group_end(ctx);
+		}
+		nk_layout_row_push(ctx, panel_width);
+		if (nk_group_begin(ctx, "panel_undo", NK_WINDOW_BORDER | NK_WINDOW_NO_SCROLLBAR)) {
+			nk_layout_row(ctx, NK_STATIC, 30, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"优化还原", NK_TEXT_CENTERED, g_color_text_l);
+			nk_layout_row(ctx, NK_STATIC, 100, 2, (float[2]) { 40, 100 });
+			nk_spacing(ctx, 1);
+			if (nk_button_image_hover(ctx, GET_PNG(IDR_PNG_CANCEL), u8"优化还原")) {
+				run_powershell_script("undo-optimize.ps1 -Level prev");
+			}
+			nk_layout_row(ctx, NK_STATIC, 30, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"回退上一版本", NK_TEXT_LEFT, g_color_text_d);
+			nk_layout_row(ctx, NK_STATIC, 30, 1, (float[1]) { 180 });
+			nk_lhc(ctx, u8"恢复设置", NK_TEXT_LEFT, g_color_text_d);
+			nk_group_end(ctx);
 		}
 		nk_layout_row_end(ctx);
 		
@@ -2540,6 +2945,11 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 		draw_storage(ctx);
 		draw_group_separator(ctx);
 	}
+	if (g_ctx.main_flag & MAIN_INFO_HEAT_DISSIPATION)
+	{
+		 draw_heat_dissipation(ctx);
+		draw_group_separator(ctx);
+	}
 	if (g_ctx.main_flag & MAIN_INFO_NETWORK)
 	{
 		draw_network(ctx);
@@ -2570,6 +2980,15 @@ out:
 		}
 	}
 		nk_group_end(ctx);
+	}
+	{
+		struct nk_window* win = ctx->current;
+		if (win) {
+			struct nk_rect bounds;
+			nk_widget(&bounds, ctx);
+			struct nk_color gray_color = { 0x70, 0x70, 0x70, 0xFF };
+			nk_stroke_line(&win->buffer, 0, height - 3, width, height - 3, 20, gray_color);
+		}
 	}
 	nk_end(ctx);
 }
