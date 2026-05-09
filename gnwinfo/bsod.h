@@ -53,6 +53,7 @@ void gnwinfo_bsod_parse_minidump(const char* dump_path, BSOD_RECORD* record);
 
 const char* gnwinfo_bsod_get_code_name(UINT32 code);
 const char* gnwinfo_bsod_get_code_desc(UINT32 code);
+const char* gnwinfo_bsod_get_code_diagnosis(UINT32 code);
 
 int gnwinfo_bsod_get_dump_enabled(void);
 int gnwinfo_bsod_set_dump_enabled(int enable);

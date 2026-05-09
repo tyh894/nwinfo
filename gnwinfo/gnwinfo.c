@@ -818,7 +818,7 @@ wWinMain(_In_ HINSTANCE hInstance,
 	int needs_refresh = 1;
 	DWORD layered_flag = LWA_ALPHA;
 	HANDLE hMutex;
-//2026.5.1  
+//2026.6.1  限制
 	SYSTEMTIME expireDate = { 0 };
 	expireDate.wYear = 2026;
 	expireDate.wMonth = 6;

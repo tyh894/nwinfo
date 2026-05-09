@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include "gnwinfo.h"
 #include "gettext.h"
 #include "utils.h"
@@ -64,8 +65,11 @@ static DWORD64 g_mem_test_size = 0;
 static HANDLE g_mem_test_thread = NULL;
 static char g_mem_test_time[128] = { 0 };
 static int g_mem_test_loaded = 0;
+static int g_cpu_test_running = 0;
 static int g_cpu_test_result = -1;
+static HANDLE g_cpu_test_thread = NULL;
 static char g_cpu_test_time[128] = { 0 };
+static char g_cpu_test_date[128] = { 0 };
 static int g_cpu_test_loaded = 0;
 
 #define BLOCK_SIZE (64 * 1024 * 1024)
@@ -220,6 +224,163 @@ static void start_memory_test(void)
 	g_mem_test_thread = CreateThread(NULL, 0, memory_test_thread, NULL, 0, NULL);
 	if (g_mem_test_thread)
 		CloseHandle(g_mem_test_thread);
+}
+
+static void start_cpu_test(void);
+static void save_cpu_test_result(int result, UINT64 prime_count, UINT64 total_tests);
+static void load_cpu_test_result(void);
+
+static BOOL test_prime(UINT64 n)
+{
+	if (n < 2) return FALSE;
+	if (n == 2) return TRUE;
+	if (n % 2 == 0) return FALSE;
+	UINT64 sqrt_n = (UINT64)sqrt((double)n);
+	for (UINT64 i = 3; i <= sqrt_n; i += 2) {
+		if (n % i == 0) return FALSE;
+	}
+	return TRUE;
+}
+
+static DWORD WINAPI cpu_test_thread(LPVOID param)
+{
+	UINT64 errors = 0;
+	UINT64 total_tests = 0;
+	UINT64 prime_count = 0;
+	
+	SYSTEMTIME start_time;
+	GetLocalTime(&start_time);
+	
+	for (int pass = 0; pass < 3; pass++) {
+		for (UINT64 n = 2; n < 100000; n++) {
+			if (test_prime(n)) {
+				prime_count++;
+			}
+			total_tests++;
+		}
+		
+		volatile double sum = 0.0;
+		for (int i = 0; i < 10000000; i++) {
+			sum += sin((double)i) * cos((double)i);
+		}
+		
+		UINT64 matrix[8][8];
+		for (int i = 0; i < 8; i++) {
+			for (int j = 0; j < 8; j++) {
+				matrix[i][j] = (i * 8 + j + pass) * 7 % 1000;
+			}
+		}
+		
+		UINT64 result[8][8] = {0};
+		for (int i = 0; i < 8; i++) {
+			for (int j = 0; j < 8; j++) {
+				for (int k = 0; k < 8; k++) {
+					result[i][j] += matrix[i][k] * matrix[k][j];
+				}
+			}
+		}
+	}
+	
+	SYSTEMTIME end_time;
+	GetLocalTime(&end_time);
+	
+	WORD start_ms = start_time.wHour * 3600000 + start_time.wMinute * 60000 + 
+					 start_time.wSecond * 1000 + start_time.wMilliseconds;
+	WORD end_ms = end_time.wHour * 3600000 + end_time.wMinute * 60000 + 
+				  end_time.wSecond * 1000 + end_time.wMilliseconds;
+	int duration = (end_ms - start_ms) / 1000;
+	
+	snprintf(g_cpu_test_time, sizeof(g_cpu_test_time), "%02d:%02d:%02d", 
+			 duration / 3600, (duration % 3600) / 60, duration % 60);
+	
+	snprintf(g_cpu_test_date, sizeof(g_cpu_test_date), "%04d-%02d-%02d %02d:%02d:%02d",
+		end_time.wYear, end_time.wMonth, end_time.wDay,
+		end_time.wHour, end_time.wMinute, end_time.wSecond);
+	
+	g_cpu_test_result = (int)(errors > 0 ? 1 : 0);
+	save_cpu_test_result(g_cpu_test_result, prime_count, total_tests);
+	g_cpu_test_running = 0;
+	return 0;
+}
+
+static void start_cpu_test(void)
+{
+	if (g_cpu_test_running)
+		return;
+
+	g_cpu_test_running = 1;
+	g_cpu_test_result = -1;
+	g_cpu_test_thread = CreateThread(NULL, 0, cpu_test_thread, NULL, 0, NULL);
+	if (g_cpu_test_thread)
+		CloseHandle(g_cpu_test_thread);
+}
+
+static void save_cpu_test_result(int result, UINT64 prime_count, UINT64 total_tests)
+{
+	FILE* fp;
+	char path[MAX_PATH];
+	char backup_dir[MAX_PATH];
+	
+	if (GetEnvironmentVariableA("USERPROFILE", backup_dir, MAX_PATH) > 0) {
+		sprintf_s(path, MAX_PATH, "%s\\herosys_data\\backup\\cpu_test_result.txt", backup_dir);
+	} else {
+		return;
+	}
+	
+	char dir_path[MAX_PATH];
+	sprintf_s(dir_path, MAX_PATH, "%s\\herosys_data\\backup", backup_dir);
+	CreateDirectoryA(dir_path, NULL);
+	
+	fopen_s(&fp, path, "w");
+	if (fp)
+	{
+		fprintf(fp, "result=%d\n", result);
+		fprintf(fp, "prime_count=%llu\n", prime_count);
+		fprintf(fp, "total_tests=%llu\n", total_tests);
+		fprintf(fp, "duration=%s\n", g_cpu_test_time);
+		fprintf(fp, "test_time=%s\n", g_cpu_test_date);
+		fclose(fp);
+	}
+}
+
+static void load_cpu_test_result(void)
+{
+	FILE* fp;
+	char path[MAX_PATH];
+	char backup_dir[MAX_PATH];
+	char line[256];
+	
+	if (GetEnvironmentVariableA("USERPROFILE", backup_dir, MAX_PATH) > 0) {
+		sprintf_s(path, MAX_PATH, "%s\\herosys_data\\backup\\cpu_test_result.txt", backup_dir);
+	} else {
+		return;
+	}
+	
+	fopen_s(&fp, path, "r");
+	if (fp)
+	{
+		while (fgets(line, sizeof(line), fp))
+		{
+			if (strncmp(line, "result=", 7) == 0)
+			{
+				g_cpu_test_result = atoi(line + 7);
+				g_cpu_test_loaded = 1;
+			}
+			else if (strncmp(line, "duration=", 9) == 0)
+			{
+				strncpy_s(g_cpu_test_time, sizeof(g_cpu_test_time), line + 9, _TRUNCATE);
+				char* p = strchr(g_cpu_test_time, '\n');
+				if (p) *p = '\0';
+			}
+			else if (strncmp(line, "test_time=", 10) == 0)
+			{
+				strncpy_s(g_cpu_test_date, sizeof(g_cpu_test_date), line + 10, _TRUNCATE);
+				char* p = strchr(g_cpu_test_date, '\n');
+				if (p) *p = '\0';
+			}
+		}
+		fclose(fp);
+	}
 }
 
 VOID
@@ -995,6 +1156,35 @@ draw_processor(struct nk_context* ctx)
 
 		nk_lhc(ctx, m_buf, NK_TEXT_LEFT, g_color_text_l);
 	}
+	
+	// if (!g_cpu_test_loaded)
+	// {
+	// 	load_cpu_test_result();
+	// 	g_cpu_test_loaded = 1;
+	// }
+	
+	// nk_layout_row(ctx, NK_DYNAMIC, 35, 2, (float[2]) { 0.7f, 0.3f });
+	// if (g_cpu_test_running)
+	// {
+	// 	nk_lhc(ctx, u8"测试中...", NK_TEXT_LEFT, g_color_warning);
+	// }
+	// else if (g_cpu_test_result == 0)
+	// {
+	// 	nk_lhcf(ctx, NK_TEXT_LEFT, g_color_good, u8"通过 (%s)", g_cpu_test_date);
+	// }
+	// else if (g_cpu_test_result > 0)
+	// {
+	// 	nk_lhcf(ctx, NK_TEXT_LEFT, g_color_warning, u8"错误 (%s)", g_cpu_test_date);
+	// }
+	// else
+	// {
+	// 	nk_lhc(ctx, u8"未测试", NK_TEXT_LEFT, g_color_text_l);
+	// }
+
+	// if (nk_button_label(ctx, u8"测试CPU"))
+	// {
+	// 	start_cpu_test();
+	// }
 }
 static VOID
 draw_processor_simple(struct nk_context* ctx)
@@ -1017,12 +1207,34 @@ draw_processor_simple(struct nk_context* ctx)
 	nk_lhc(ctx, m_buf, NK_TEXT_LEFT, g_color_text_l);
 	snprintf(m_buf, MAX_PATH, u8"频率：%lu MHz", g_ctx.cpu_freq);
 	nk_lhc(ctx, m_buf, NK_TEXT_LEFT, g_color_text_l);
-
+	
+	if (!g_cpu_test_loaded)
+	{
+		load_cpu_test_result();
+		g_cpu_test_loaded = 1;
+	}
+	
 	nk_layout_row(ctx, NK_DYNAMIC, 35, 2, (float[2]) { 0.7f, 0.3f });
-	nk_lhc(ctx, u8"未测试", NK_TEXT_LEFT, g_color_text_l);
+	if (g_cpu_test_running)
+	{
+		nk_lhc(ctx, u8"测试中...", NK_TEXT_LEFT, g_color_warning);
+	}
+	else if (g_cpu_test_result == 0)
+	{
+		nk_lhcf(ctx, NK_TEXT_LEFT, g_color_good, u8"通过 (%s)", g_cpu_test_date);
+	}
+	else if (g_cpu_test_result > 0)
+	{
+		nk_lhcf(ctx, NK_TEXT_LEFT, g_color_warning, u8"错误 (%s)", g_cpu_test_date);
+	}
+	else
+	{
+		nk_lhc(ctx, u8"未测试", NK_TEXT_LEFT, g_color_text_l);
+	}
+
 	if (nk_button_label(ctx, u8"测试CPU"))
 	{
-
+		start_cpu_test();
 	}
 }
 
@@ -2733,9 +2945,30 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 				nk_lhc(ctx, u8"错误码:", NK_TEXT_LEFT, g_color_text_d);
 				nk_lhcf(ctx, NK_TEXT_LEFT, g_color_warning, "%s (%s)", record->bugcheck_code, record->bugcheck_name);
 				
+				if (record->dump_file[0] != '\0') {
+					nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.2f, 0.8f });
+					nk_lhc(ctx, u8"转储文件:", NK_TEXT_LEFT, g_color_text_d);
+					const char* basename = strrchr(record->dump_file, '\\');
+					if (basename) basename++;
+					else basename = record->dump_file;
+					nk_lhc(ctx, basename, NK_TEXT_LEFT, g_color_text_l);
+				}
+				
 				nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.2f, 0.8f });
 				nk_lhc(ctx, u8"描述:", NK_TEXT_LEFT, g_color_text_d);
 				nk_lhc(ctx, gnwinfo_bsod_get_code_desc(record->bugcheck_id), NK_TEXT_LEFT, g_color_text_l);
+				
+				if (record->process_name[0] != '\0') {
+					nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.2f, 0.8f });
+					nk_lhc(ctx, u8"崩溃时运行的程序:", NK_TEXT_LEFT, g_color_text_d);
+					nk_lhc(ctx, record->process_name, NK_TEXT_LEFT, g_color_text_l);
+				}
+				
+				if (record->caused_by_driver[0] != '\0') {
+					nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.2f, 0.8f });
+					nk_lhc(ctx, u8"导致问题的驱动模块:", NK_TEXT_LEFT, g_color_text_d);
+					nk_lhc(ctx, record->caused_by_driver, NK_TEXT_LEFT, g_color_warning);
+				}
 				
 				if (record->caused_by_driver[0] != '\0' && record->process_name[0] != '\0') {
 					nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.2f, 0.8f });
@@ -2745,27 +2978,24 @@ gnwinfo_draw_main_window(struct nk_context* ctx, float width, float height)
 						u8"%s驱动存在缺陷，%s运行并进行某些特定操作时导致系统崩溃", 
 						record->caused_by_driver, record->process_name);
 					nk_lhc(ctx, analysis, NK_TEXT_LEFT, g_color_warning);
-				} else {
-					if (record->process_name[0] != '\0') {
-						nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.2f, 0.8f });
-						nk_lhc(ctx, u8"崩溃时正在运行的程序:", NK_TEXT_LEFT, g_color_text_d);
-						nk_lhc(ctx, record->process_name, NK_TEXT_LEFT, g_color_text_l);
-					}
-					
-					if (record->caused_by_driver[0] != '\0') {
-						nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.2f, 0.8f });
-						nk_lhc(ctx, u8"导致问题的驱动模块:", NK_TEXT_LEFT, g_color_text_d);
-						nk_lhc(ctx, record->caused_by_driver, NK_TEXT_LEFT, g_color_warning);
-					}
+				} else if (record->process_name[0] != '\0') {
+					nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.2f, 0.8f });
+					nk_lhc(ctx, u8"原因分析:", NK_TEXT_LEFT, g_color_text_d);
+					char analysis[256];
+					_snprintf_s(analysis, sizeof(analysis), _TRUNCATE, u8"程序 %s 运行时发生崩溃", record->process_name);
+					nk_lhc(ctx, analysis, NK_TEXT_LEFT, g_color_warning);
+				} else if (record->caused_by_driver[0] != '\0') {
+					nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.2f, 0.8f });
+					nk_lhc(ctx, u8"原因分析:", NK_TEXT_LEFT, g_color_text_d);
+					char analysis[256];
+					_snprintf_s(analysis, sizeof(analysis), _TRUNCATE, u8"驱动 %s 导致系统崩溃", record->caused_by_driver);
+					nk_lhc(ctx, analysis, NK_TEXT_LEFT, g_color_warning);
 				}
 				
-				if (record->dump_file[0] != '\0') {
-					nk_layout_row(ctx, NK_DYNAMIC, 0, 2, (float[2]) { 0.2f, 0.8f });
-					nk_lhc(ctx, u8"转储文件:", NK_TEXT_LEFT, g_color_text_d);
-					const char* basename = strrchr(record->dump_file, '\\');
-					if (basename) basename++;
-					else basename = record->dump_file;
-					nk_lhc(ctx, basename, NK_TEXT_LEFT, g_color_text_l);
+				const char* diagnosis = gnwinfo_bsod_get_code_diagnosis(record->bugcheck_id);
+				if (diagnosis && diagnosis[0] != '\0') {
+					nk_layout_row(ctx, NK_DYNAMIC, 0, 1, (float[1]) { 1.0f });
+					nk_lhcf(ctx, NK_TEXT_LEFT, g_color_good, u8"诊断建议: %s", diagnosis);
 				}
 				
 				nk_layout_row(ctx, NK_DYNAMIC, 10, 1, (float[1]) { 1.0f });
