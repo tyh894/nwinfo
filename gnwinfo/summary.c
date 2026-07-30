@@ -72,6 +72,10 @@ static char g_cpu_test_time[128] = { 0 };
 static char g_cpu_test_date[128] = { 0 };
 static int g_cpu_test_loaded = 0;
 
+static int g_optimize_running = 0;
+static int g_optimize_progress = 0;
+static HANDLE g_optimize_thread = NULL;
+
 #define BLOCK_SIZE (64 * 1024 * 1024)
 #define TEST_PATTERNS 4
 
@@ -383,9 +387,10 @@ static void load_cpu_test_result(void)
 	}
 }
 
-VOID
-run_powershell_script(LPCSTR script_name_with_args)
+static DWORD WINAPI optimize_thread(LPVOID param)
 {
+	char* script_args = (char*)param;
+	
 	char exe_path[MAX_PATH];
 	char full_script_path[MAX_PATH];
 	char cmd_line[MAX_PATH * 2];
@@ -401,27 +406,112 @@ run_powershell_script(LPCSTR script_name_with_args)
 		sprintf_s(backup_dir, MAX_PATH, "%s\\herosys_data\\backup", exe_path);
 	}
 	
-	if (strchr(script_name_with_args, ' ')) {
-		char script_name[MAX_PATH];
-		char* args = strchr(script_name_with_args, ' ');
-		size_t name_len = args - script_name_with_args;
-		strncpy_s(script_name, MAX_PATH, script_name_with_args, name_len);
+	char script_name[MAX_PATH] = {0};
+	char* args = "";
+	
+	if (strchr(script_args, ' ')) {
+		char* space = strchr(script_args, ' ');
+		size_t name_len = space - script_args;
+		strncpy_s(script_name, MAX_PATH, script_args, name_len);
 		script_name[name_len] = '\0';
-		args++;
-		
-		sprintf_s(full_script_path, MAX_PATH, "%s\\ICP-Optimizer\\%s", exe_path, script_name);
-		sprintf_s(cmd_line, MAX_PATH * 2, 
-			"-ExecutionPolicy Bypass -NoProfile -File \"%s\" %s -BackupDir \"%s\"", 
-			full_script_path, args, backup_dir);
-		ShellExecuteA(NULL, "open", "powershell.exe", cmd_line, NULL, SW_SHOWNORMAL);
+		args = space + 1;
 	} else {
-		sprintf_s(full_script_path, MAX_PATH, "%s\\ICP-Optimizer\\%s", 
-			exe_path, script_name_with_args);
-		sprintf_s(cmd_line, MAX_PATH * 2, 
-			"-ExecutionPolicy Bypass -NoProfile -File \"%s\" -BackupDir \"%s\"", 
-			full_script_path, backup_dir);
-		ShellExecuteA(NULL, "open", "powershell.exe", cmd_line, NULL, SW_SHOWNORMAL);
+		strncpy_s(script_name, MAX_PATH, script_args, _TRUNCATE);
 	}
+	
+	STARTUPINFOA si = {0};
+	si.cb = sizeof(si);
+	si.dwFlags = STARTF_USESHOWWINDOW;
+	si.wShowWindow = SW_HIDE;
+	PROCESS_INFORMATION pi = {0};
+	
+	sprintf_s(full_script_path, MAX_PATH, "%s\\ICP-Optimizer\\%s", exe_path, script_name);
+	sprintf_s(cmd_line, MAX_PATH * 2, 
+		"powershell.exe -ExecutionPolicy Bypass -NoProfile -File \"%s\" %s -BackupDir \"%s\"", 
+		full_script_path, args, backup_dir);
+	
+	g_optimize_progress = 0;
+	CreateProcessA(NULL, cmd_line, NULL, NULL, FALSE, CREATE_NO_WINDOW | CREATE_DEFAULT_ERROR_MODE, NULL, NULL, &si, &pi);
+	
+	while (1) {
+		DWORD result = WaitForSingleObject(pi.hProcess, 500);
+		if (result == WAIT_OBJECT_0) {
+			g_optimize_progress = 100;
+			break;
+		}
+		if (g_optimize_progress < 95) {
+			g_optimize_progress += 5;
+		}
+	}
+	
+	CloseHandle(pi.hProcess);
+	CloseHandle(pi.hThread);
+	
+	g_optimize_running = 0;
+	free(script_args);
+	return 0;
+}
+
+VOID
+run_powershell_script(LPCSTR script_name_with_args)
+{
+	if (g_optimize_running)
+		return;
+	
+	g_optimize_running = 1;
+	g_optimize_progress = 0;
+	g_ctx.window_flag |= GUI_WINDOW_OPTIMIZE;
+	
+	char* args_copy = _strdup(script_name_with_args);
+	g_optimize_thread = CreateThread(NULL, 0, optimize_thread, args_copy, 0, NULL);
+	if (g_optimize_thread)
+		CloseHandle(g_optimize_thread);
+}
+
+VOID
+gnwinfo_draw_optimize_window(struct nk_context* ctx, float width, float height)
+{
+	if (!(g_ctx.window_flag & GUI_WINDOW_OPTIMIZE))
+		return;
+	
+	if (!nk_begin_ex(ctx, u8"优化",
+		nk_rect(width / 4.0f, height / 3.0f, 400, 200),
+		NK_WINDOW_BORDER | NK_WINDOW_MOVABLE | NK_WINDOW_CLOSABLE,
+		GET_PNG(IDR_PNG_INFO), GET_PNG(IDR_PNG_CLOSE)))
+	{
+		g_ctx.window_flag &= ~GUI_WINDOW_OPTIMIZE;
+		goto out;
+	}
+	
+	nk_layout_row_dynamic(ctx, 0, 1);
+	nk_spacer(ctx);
+	
+	if (g_optimize_progress >= 100) {
+		nk_l(ctx, u8"优化完成", NK_TEXT_CENTERED);
+	} else {
+		nk_l(ctx, u8"系统优化中...", NK_TEXT_CENTERED);
+	}
+	
+	nk_layout_row_dynamic(ctx, 0, 1);
+	nk_spacer(ctx);
+	
+	nk_layout_row_dynamic(ctx, 0, 1);
+	nk_lhcf(ctx, NK_TEXT_CENTERED, g_color_good, u8"%d%%", g_optimize_progress);
+	
+	nk_layout_row_dynamic(ctx, 0, 1);
+	nk_spacer(ctx);
+	
+	{
+		nk_size size = (nk_size)g_optimize_progress;
+		if (size > 100) size = 100;
+		ctx->style.progress.cursor_normal = nk_style_item_color(g_color_good);
+		ctx->style.progress.cursor_hover = nk_style_item_color(g_color_good);
+		ctx->style.progress.cursor_active = nk_style_item_color(g_color_good);
+		nk_progress(ctx, &size, 100, 0);
+	}
+	
+out:
+	nk_end(ctx);
 }
 
 static void

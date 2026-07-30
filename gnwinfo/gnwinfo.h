@@ -113,6 +113,7 @@ nk_block(struct nk_context* ctx, struct nk_color color, const char* str);
 #define GUI_WINDOW_DISPLAY  (1U << 8)
 #define GUI_WINDOW_SENSOR   (1U << 9)
 #define GUI_WINDOW_CUSTOMIZE (1U << 10)
+#define GUI_WINDOW_OPTIMIZE  (1U << 11)
 
 typedef struct _GNW_CONTEXT
 {
@@ -238,6 +239,7 @@ VOID gnwinfo_draw_dmi_window(struct nk_context* ctx, float width, float height);
 VOID gnwinfo_draw_display_window(struct nk_context* ctx, float width, float height);
 VOID gnwinfo_draw_sensor_window(struct nk_context* ctx, float width, float height);
 VOID gnwinfo_draw_customize_window(struct nk_context* ctx, float width, float height);
+VOID gnwinfo_draw_optimize_window(struct nk_context* ctx, float width, float height);
 
 VOID gnwinfo_set_style(struct nk_context* ctx);
 

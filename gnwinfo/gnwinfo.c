@@ -519,7 +519,7 @@ set_dpi_scaling(HWND wnd)
 		static int base_font_size = 0;
 		if (base_font_size == 0)
 			base_font_size = strtol(gnwinfo_get_ini_value(L"Window", L"FontSize", L"16"), NULL, 10);
-		g_font_size = (int)(base_font_size * g_dpi_factor);
+		g_font_size = base_font_size;
 		
 		SetWindowPos(wnd, NULL, 0, 0, new_width, new_height,
 			SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
@@ -558,7 +558,7 @@ window_proc(HWND wnd, UINT msg, WPARAM wparam, LPARAM lparam)
 		case ID_TRAY_SHOW:
 		{
 			struct nk_window* win;
-			const char* title = u8"���ػ��ڱ�";
+			const char* title = u8"NWinfo GUI";
 			for (win = g_ctx.nk->begin; win != NULL; win = win->next)
 			{
 				if (strcmp(win->name_string, title) == 0)
@@ -592,7 +592,7 @@ window_proc(HWND wnd, UINT msg, WPARAM wparam, LPARAM lparam)
 		case WM_LBUTTONDBLCLK:
 		{
 			struct nk_window* win;
-			const char* title = u8"���ػ��ڱ�";
+			const char* title = u8"NWinfo GUI";
 			for (win = g_ctx.nk->begin; win != NULL; win = win->next)
 			{
 				if (strcmp(win->name_string, title) == 0)
@@ -612,7 +612,7 @@ window_proc(HWND wnd, UINT msg, WPARAM wparam, LPARAM lparam)
 	case WM_SHOWMAIN:
 	{
 		struct nk_window* win;
-		const char* title = u8"���ػ��ڱ�";
+		const char* title = u8"NWinfo GUI";
 		for (win = g_ctx.nk->begin; win != NULL; win = win->next)
 		{
 			if (strcmp(win->name_string, title) == 0)
@@ -685,7 +685,7 @@ window_proc(HWND wnd, UINT msg, WPARAM wparam, LPARAM lparam)
 		static int base_font_size = 0;
 		if (base_font_size == 0)
 			base_font_size = strtol(gnwinfo_get_ini_value(L"Window", L"FontSize", L"16"), NULL, 10);
-		g_font_size = (int)(base_font_size * g_dpi_factor);
+		g_font_size = base_font_size;
 		g_font = nk_gdip_load_font(font_name, g_font_size);
 		nk_gdip_set_font(g_font);
 	}
@@ -753,6 +753,15 @@ window_proc(HWND wnd, UINT msg, WPARAM wparam, LPARAM lparam)
 		g_ctx.gui_height = HIWORD(lparam);
 		g_ctx.gui_width = LOWORD(lparam);
 		break;
+	case WM_EXITSIZEMOVE:
+	{
+		SetWindowPos(wnd, NULL, 0, 0, g_init_width, g_init_height, SWP_NOMOVE | SWP_NOZORDER);
+		nk_gdip_resize(g_init_width, g_init_height);
+		//g_ctx.gui_width = g_init_width;
+		//g_ctx.gui_height = g_init_height;
+		RedrawWindow(wnd, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ERASE);
+		break;
+	}
 	}
 	if (nk_gdip_handle_event(wnd, msg, wparam, lparam))
 		return 0;
@@ -818,10 +827,10 @@ wWinMain(_In_ HINSTANCE hInstance,
 	int needs_refresh = 1;
 	DWORD layered_flag = LWA_ALPHA;
 	HANDLE hMutex;
-//2026.6.1  限制
+//2026.6.1  ??
 	SYSTEMTIME expireDate = { 0 };
 	expireDate.wYear = 2026;
-	expireDate.wMonth = 6;
+	expireDate.wMonth = 9;
 	expireDate.wDay = 1;
 	SYSTEMTIME currentTime = { 0 };
 	GetLocalTime(&currentTime);
@@ -1021,6 +1030,7 @@ wWinMain(_In_ HINSTANCE hInstance,
 		gnwinfo_draw_display_window(ctx, g_ctx.gui_width, g_ctx.gui_height);
 		gnwinfo_draw_mm_window(ctx, g_ctx.gui_width, g_ctx.gui_height);
 		gnwinfo_draw_hostname_window(ctx, g_ctx.gui_width, g_ctx.gui_height);
+		gnwinfo_draw_optimize_window(ctx, g_ctx.gui_width, g_ctx.gui_height);
 		ReleaseSRWLockExclusive(&g_ctx.lock);
 		if (g_ctx.exit_pending)
 			gnwinfo_ctx_exit();
