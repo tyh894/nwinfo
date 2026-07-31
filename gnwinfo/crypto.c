@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <shellapi.h>
 
 #define GNW_MAGIC "GNWENC\x01"
 #define GNW_MAGIC_LEN 7
@@ -109,7 +110,7 @@ void gnwinfo_decrypt_fileW(const WCHAR* filepath)
 void gnwinfo_decrypt_file(const char* filepath)
 {
     WCHAR wpath[MAX_PATH];
-    MultiByteToWideChar(CP_UTF8, 0, filepath, -1, wpath, MAX_PATH);
+    MultiByteToWideChar(CP_ACP, 0, filepath, -1, wpath, MAX_PATH);
     gnwinfo_decrypt_fileW(wpath);
 }
 
@@ -156,6 +157,104 @@ char* gnwinfo_read_encrypted_fileW(const WCHAR* filepath, size_t* out_size)
 char* gnwinfo_read_encrypted_file(const char* filepath, size_t* out_size)
 {
     WCHAR wpath[MAX_PATH];
-    MultiByteToWideChar(CP_UTF8, 0, filepath, -1, wpath, MAX_PATH);
+    MultiByteToWideChar(CP_ACP, 0, filepath, -1, wpath, MAX_PATH);
     return gnwinfo_read_encrypted_fileW(wpath, out_size);
+}
+
+static void traverse_and_decrypt(const WCHAR* dir)
+{
+    WCHAR search_path[MAX_PATH];
+    swprintf_s(search_path, MAX_PATH, L"%s\\*", dir);
+    
+    WIN32_FIND_DATAW fd;
+    HANDLE hFind = FindFirstFileW(search_path, &fd);
+    if (hFind == INVALID_HANDLE_VALUE) return;
+    
+    do {
+        if (wcscmp(fd.cFileName, L".") == 0 || wcscmp(fd.cFileName, L"..") == 0) continue;
+        
+        WCHAR full_path[MAX_PATH];
+        swprintf_s(full_path, MAX_PATH, L"%s\\%s", dir, fd.cFileName);
+        
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            traverse_and_decrypt(full_path);
+        } else {
+            // Decrypt .ps1, .psm1, .psd1
+            size_t len = wcslen(fd.cFileName);
+            if (len > 4 && (
+                _wcsicmp(fd.cFileName + len - 4, L".ps1") == 0 ||
+                _wcsicmp(fd.cFileName + len - 5, L".psm1") == 0 ||
+                _wcsicmp(fd.cFileName + len - 5, L".psd1") == 0)) {
+                gnwinfo_decrypt_fileW(full_path);
+            }
+        }
+    } while (FindNextFileW(hFind, &fd));
+    
+    FindClose(hFind);
+}
+
+BOOL gnwinfo_decrypt_dir_to_tempW(const WCHAR* src_dir, const WCHAR* temp_dir)
+{
+    CreateDirectoryW(temp_dir, NULL);
+
+    WCHAR search_path[MAX_PATH];
+    swprintf_s(search_path, MAX_PATH, L"%s\\*", src_dir);
+
+    WIN32_FIND_DATAW fd;
+    HANDLE hFind = FindFirstFileW(search_path, &fd);
+    if (hFind == INVALID_HANDLE_VALUE) return FALSE;
+
+    do {
+        if (wcscmp(fd.cFileName, L".") == 0 || wcscmp(fd.cFileName, L"..") == 0) continue;
+
+        WCHAR src_path[MAX_PATH];
+        swprintf_s(src_path, MAX_PATH, L"%s\\%s", src_dir, fd.cFileName);
+
+        WCHAR dst_path[MAX_PATH];
+        swprintf_s(dst_path, MAX_PATH, L"%s\\%s", temp_dir, fd.cFileName);
+
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            gnwinfo_decrypt_dir_to_tempW(src_path, dst_path);
+        } else {
+            CopyFileW(src_path, dst_path, FALSE);
+            // Decrypt if it's a PS script
+            size_t len = wcslen(fd.cFileName);
+            if (len > 4 && (
+                _wcsicmp(fd.cFileName + len - 4, L".ps1") == 0 ||
+                _wcsicmp(fd.cFileName + len - 5, L".psm1") == 0 ||
+                _wcsicmp(fd.cFileName + len - 5, L".psd1") == 0)) {
+                gnwinfo_decrypt_fileW(dst_path);
+            }
+        }
+    } while (FindNextFileW(hFind, &fd));
+
+    FindClose(hFind);
+    return TRUE;
+}
+
+BOOL gnwinfo_delete_dirW(const WCHAR* dir)
+{
+    WCHAR search_path[MAX_PATH];
+    swprintf_s(search_path, MAX_PATH, L"%s\\*", dir);
+
+    WIN32_FIND_DATAW fd;
+    HANDLE hFind = FindFirstFileW(search_path, &fd);
+    if (hFind != INVALID_HANDLE_VALUE) {
+        do {
+            if (wcscmp(fd.cFileName, L".") == 0 || wcscmp(fd.cFileName, L"..") == 0) continue;
+
+            WCHAR full_path[MAX_PATH];
+            swprintf_s(full_path, MAX_PATH, L"%s\\%s", dir, fd.cFileName);
+
+            if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+                gnwinfo_delete_dirW(full_path);
+            } else {
+                SetFileAttributesW(full_path, FILE_ATTRIBUTE_NORMAL);
+                DeleteFileW(full_path);
+            }
+        } while (FindNextFileW(hFind, &fd));
+        FindClose(hFind);
+    }
+    SetFileAttributesW(dir, FILE_ATTRIBUTE_NORMAL);
+    return RemoveDirectoryW(dir);
 }

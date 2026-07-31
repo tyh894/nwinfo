@@ -1,4 +1,4 @@
-
+ï»¿
 
 #include "gnwinfo.h"
 #include "gettext.h"
@@ -127,7 +127,7 @@ void gnwinfo_set_autostart_internal(nk_bool enable, nk_bool show_message)
 	{
 		NWL_Debug("AUTOSTART", "Set: CoInitializeEx failed: 0x%08X", hr);
 		if (show_message)
-			MessageBoxW(NULL, L"³õÊ¼»¯ COM Ê§°Ü", L"×Ô¶¯Æô¶¯ÉèÖÃ", MB_OK | MB_ICONERROR);
+			MessageBoxW(NULL, L"åˆå§‹åŒ– COM å¤±è´¥", L"è‡ªåŠ¨å¯åŠ¨è®¾ç½®", MB_OK | MB_ICONERROR);
 		return;
 	}
 
@@ -141,7 +141,7 @@ void gnwinfo_set_autostart_internal(nk_bool enable, nk_bool show_message)
 		NWL_Debug("AUTOSTART", "Set: CoCreateInstance failed: 0x%08X", hr);
 		CoUninitialize();
 		if (show_message)
-			MessageBoxW(NULL, L"´´½¨ÈÎÎñ¼Æ»®³ÌÐòÊ§°Ü", L"×Ô¶¯Æô¶¯ÉèÖÃ", MB_OK | MB_ICONERROR);
+			MessageBoxW(NULL, L"åˆ›å»ºä»»åŠ¡è®¡åˆ’ç¨‹åºå¤±è´¥", L"è‡ªåŠ¨å¯åŠ¨è®¾ç½®", MB_OK | MB_ICONERROR);
 		return;
 	}
 
@@ -155,7 +155,7 @@ void gnwinfo_set_autostart_internal(nk_bool enable, nk_bool show_message)
 		pService->lpVtbl->Release(pService);
 		CoUninitialize();
 		if (show_message)
-			MessageBoxW(NULL, L"Á¬½ÓÈÎÎñ¼Æ»®³ÌÐòÊ§°Ü", L"×Ô¶¯Æô¶¯ÉèÖÃ", MB_OK | MB_ICONERROR);
+			MessageBoxW(NULL, L"è¿žæŽ¥ä»»åŠ¡è®¡åˆ’ç¨‹åºå¤±è´¥", L"è‡ªåŠ¨å¯åŠ¨è®¾ç½®", MB_OK | MB_ICONERROR);
 		return;
 	}
 
@@ -169,7 +169,7 @@ void gnwinfo_set_autostart_internal(nk_bool enable, nk_bool show_message)
 		pService->lpVtbl->Release(pService);
 		CoUninitialize();
 		if (show_message)
-			MessageBoxW(NULL, L"»ñÈ¡ÈÎÎñÎÄ¼þ¼ÐÊ§°Ü", L"×Ô¶¯Æô¶¯ÉèÖÃ", MB_OK | MB_ICONERROR);
+			MessageBoxW(NULL, L"èŽ·å–ä»»åŠ¡æ–‡ä»¶å¤¹å¤±è´¥", L"è‡ªåŠ¨å¯åŠ¨è®¾ç½®", MB_OK | MB_ICONERROR);
 		return;
 	}
 
@@ -323,11 +323,11 @@ cleanup:
 	{
 		if (enable)
 		{
-			MessageBoxW(NULL, L"×Ô¶¯Æô¶¯ÉèÖÃ³É¹¦£¡\n\nÒÑ´´½¨ÈÎÎñ¼Æ»®³ÌÐòÈÎÎñ\n½«ÔÚÓÃ»§µÇÂ¼Ê±ÒÔ¹ÜÀíÔ±È¨ÏÞ×Ô¶¯ÔËÐÐ¡£", L"×Ô¶¯Æô¶¯ÉèÖÃ", MB_OK | MB_ICONINFORMATION);
+			MessageBoxW(NULL, L"è‡ªåŠ¨å¯åŠ¨è®¾ç½®æˆåŠŸï¼\n\nå·²åˆ›å»ºä»»åŠ¡è®¡åˆ’ç¨‹åºä»»åŠ¡\nå°†åœ¨ç”¨æˆ·ç™»å½•æ—¶ä»¥ç®¡ç†å‘˜æƒé™è‡ªåŠ¨è¿è¡Œã€‚", L"è‡ªåŠ¨å¯åŠ¨è®¾ç½®", MB_OK | MB_ICONINFORMATION);
 		}
 		else
 		{
-			MessageBoxW(NULL, L"ÒÑÉ¾³ý×Ô¶¯Æô¶¯ÈÎÎñ", L"×Ô¶¯Æô¶¯ÉèÖÃ", MB_OK | MB_ICONINFORMATION);
+			MessageBoxW(NULL, L"å·²åˆ é™¤è‡ªåŠ¨å¯åŠ¨ä»»åŠ¡", L"è‡ªåŠ¨å¯åŠ¨è®¾ç½®", MB_OK | MB_ICONINFORMATION);
 		}
 	}
 }

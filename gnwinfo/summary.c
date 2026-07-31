@@ -10,6 +10,7 @@
 #include "gettext.h"
 #include "utils.h"
 #include "server.h"
+#include "crypto.h"
 
 static CHAR m_buf[MAX_PATH];
 static int g_group_index = 0;
@@ -440,7 +441,20 @@ static DWORD WINAPI optimize_thread(LPVOID param)
 	si.wShowWindow = SW_HIDE;
 	PROCESS_INFORMATION pi = {0};
 	
-	sprintf_s(full_script_path, MAX_PATH, "%s\\ICP-Optimizer\\%s", exe_path, script_name);
+	char src_dir[MAX_PATH];
+	char temp_dir[MAX_PATH];
+	sprintf_s(src_dir, MAX_PATH, "%s\\ICP-Optimizer", exe_path);
+	sprintf_s(temp_dir, MAX_PATH, "%s\\~ICP-Opt-%lu", exe_path, GetTickCount());
+	
+	WCHAR w_src_dir[MAX_PATH];
+	WCHAR w_temp_dir[MAX_PATH];
+	MultiByteToWideChar(CP_ACP, 0, src_dir, -1, w_src_dir, MAX_PATH);
+	MultiByteToWideChar(CP_ACP, 0, temp_dir, -1, w_temp_dir, MAX_PATH);
+	
+	// Copy and decrypt powershell scripts to temp dir
+	gnwinfo_decrypt_dir_to_tempW(w_src_dir, w_temp_dir);
+	
+	sprintf_s(full_script_path, MAX_PATH, "%s\\%s", temp_dir, script_name);
 	sprintf_s(cmd_line, MAX_PATH * 2, 
 		"powershell.exe -ExecutionPolicy Bypass -NoProfile -File \"%s\" %s -BackupDir \"%s\"", 
 		full_script_path, args, backup_dir);
@@ -461,6 +475,9 @@ static DWORD WINAPI optimize_thread(LPVOID param)
 	
 	CloseHandle(pi.hProcess);
 	CloseHandle(pi.hThread);
+	
+	// Delete the temp directory
+	gnwinfo_delete_dirW(w_temp_dir);
 	
 	g_optimize_running = 0;
 	free(script_args);
