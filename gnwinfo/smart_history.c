@@ -3,6 +3,7 @@
 #include "gnwinfo.h"
 #include "../libcdi/libcdi.h"
 #include <time.h>
+#include "crypto.h"
 
 #define MAX_PATH_LEN 512
 #define MAX_CSV_COLS 64
@@ -81,10 +82,14 @@ static disk_last_values_t* create_last_values(const char* serial)
 
 static int load_last_values_from_csv(disk_last_values_t* last, const char* filename, BOOL is_nvme)
 {
+    gnwinfo_decrypt_file(filename);
+    
     FILE* fp = NULL;
     fopen_s(&fp, filename, "r");
-    if (fp == NULL)
+    if (fp == NULL) {
+        gnwinfo_encrypt_file(filename);
         return 0;
+    }
     
     char line[8192];
     char* header_line = NULL;
@@ -94,6 +99,7 @@ static int load_last_values_from_csv(disk_last_values_t* last, const char* filen
     header_line = fgets(line, sizeof(line), fp);
     if (header_line == NULL) {
         fclose(fp);
+        gnwinfo_encrypt_file(filename);
         return 0;
     }
     
@@ -118,6 +124,7 @@ static int load_last_values_from_csv(disk_last_values_t* last, const char* filen
     }
     
     fclose(fp);
+    gnwinfo_encrypt_file(filename);
     
     if (prev_line[0] == '\0')
         return 0;
@@ -377,6 +384,7 @@ void gnwinfo_save_smart_history(void)
                     }
                     fprintf(fp, "\n");
                     fclose(fp);
+                    gnwinfo_encrypt_file(filename);
                 }
             }
             cdi_free_string(serial);
@@ -394,10 +402,13 @@ void gnwinfo_save_smart_history(void)
         
         save_current_values(last, disk_index, attr_count, is_nvme);
         
+        gnwinfo_decrypt_file(filename);
+        
         FILE* fp = NULL;
         fopen_s(&fp, filename, "a");
         if (fp == NULL)
         {
+            gnwinfo_encrypt_file(filename);
             cdi_free_string(serial);
             if (drive_map) cdi_free_string(drive_map);
             continue;
@@ -435,6 +446,8 @@ void gnwinfo_save_smart_history(void)
         fprintf(fp, "\n");
         
         fclose(fp);
+        gnwinfo_encrypt_file(filename);
+        
         cdi_free_string(serial);
         if (drive_map) cdi_free_string(drive_map);
     }
@@ -442,13 +455,18 @@ void gnwinfo_save_smart_history(void)
 
 static int load_csv_file(const char* filename)
 {
+    gnwinfo_decrypt_file(filename);
+    
     FILE* fp = NULL;
     fopen_s(&fp, filename, "r");
-    if (fp == NULL)
+    if (fp == NULL) {
+        gnwinfo_encrypt_file(filename);
         return -1;
+    }
     
     if (g_csv_count >= 16) {
         fclose(fp);
+        gnwinfo_encrypt_file(filename);
         return -1;
     }
     
@@ -477,6 +495,7 @@ static int load_csv_file(const char* filename)
     
     csv->rows = row;
     fclose(fp);
+    gnwinfo_encrypt_file(filename);
     
     g_csv_count++;
     return g_csv_count - 1;

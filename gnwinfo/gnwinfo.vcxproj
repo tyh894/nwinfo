@@ -216,6 +216,7 @@
     <ClCompile Include="summary.c" />
     <ClCompile Include="utils.c" />
     <ClCompile Include="server.c" />
+    <ClCompile Include="crypto.c" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\libnw\libnw.vcxproj">

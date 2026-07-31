@@ -25,6 +25,7 @@ unsigned int g_init_alpha = 255;
 unsigned int g_smart_interval = 600;
 GdipFont* g_font = NULL;
 #include "server.h"
+#include "crypto.h"
 
 int g_font_size = 12;
 double g_dpi_factor = 1.0;
@@ -425,10 +426,13 @@ void gnwinfo_save_hw_config(void)
 	wcscat_s(hw_path, MAX_PATH, time_str);
 
 	FILE* fp = NULL;
-	if (_wfopen_s(&fp, hw_path, L"w") == 0 && fp)
+	if (_wfopen_s(&fp, hw_path, L"wb") == 0 && fp)
 	{
 		NW_Export(NWLC->NwRoot, fp);
 		fclose(fp);
+		
+		gnwinfo_encrypt_fileW(hw_path);
+		
 		printf("DEBUG: JSON file saved: %S\n", hw_path);
 		
 		char msg[512];

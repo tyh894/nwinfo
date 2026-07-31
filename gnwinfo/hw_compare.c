@@ -3,6 +3,7 @@
 #include <string.h>
 #include "gnwinfo.h"
 #include "cJSON.h"
+#include "crypto.h"
 #include "utils.h"
 
 static cJSON* g_hw_json = NULL;
@@ -76,38 +77,53 @@ void gnwinfo_hw_compare_init(void)
 		wcscpy_s(full_path, MAX_PATH, g_hw_json_path);
 		wcscat_s(full_path, MAX_PATH, latest_file);
 
-		FILE* fp = NULL;
-		if (_wfopen_s(&fp, full_path, L"rb") == 0 && fp)
+		size_t read_size = 0;
+		char* json_buffer = gnwinfo_read_encrypted_fileW(full_path, &read_size);
+		if (json_buffer)
 		{
-			fseek(fp, 0, SEEK_END);
-			long file_size = ftell(fp);
-			fseek(fp, 0, SEEK_SET);
-
-			char* json_buffer = (char*)malloc(file_size + 1);
-			if (json_buffer)
+			if (g_hw_json)
 			{
-				size_t read_size = fread(json_buffer, 1, file_size, fp);
-				json_buffer[read_size] = '\0';
-
-				if (g_hw_json)
-				{
-					cJSON_Delete(g_hw_json);
-					g_hw_json = NULL;
-				}
-				g_hw_json = cJSON_Parse(json_buffer);
-				if (g_hw_json)
-				{
-					wcscpy_s(g_hw_json_path, MAX_PATH, full_path);
-					g_need_initial_save = nk_false;
-				}
-				else
-				{
-					g_need_initial_save = nk_true;
-				}
-
-				free(json_buffer);
+				cJSON_Delete(g_hw_json);
+				g_hw_json = NULL;
 			}
-			fclose(fp);
+			
+			// Remove UTF-8 BOM if present, otherwise cJSON might fail to parse
+			char* parse_start = json_buffer;
+			if (read_size >= 3 && (unsigned char)json_buffer[0] == 0xEF && (unsigned char)json_buffer[1] == 0xBB && (unsigned char)json_buffer[2] == 0xBF)
+			{
+				parse_start += 3;
+			}
+			
+			// HACK: cJSON doesn't support \n inside string literals if it's not escaped.
+			// Let's escape raw newlines to spaces to ensure JSON structure is kept intact.
+			int in_string = 0;
+			for (size_t i = 0; i < read_size; i++) {
+				if (json_buffer[i] == '"' && (i == 0 || json_buffer[i-1] != '\\')) {
+					in_string = !in_string;
+				}
+				if (in_string) {
+					if (json_buffer[i] == '\n' || json_buffer[i] == '\r') {
+						json_buffer[i] = ' ';
+					}
+				}
+			}
+
+			g_hw_json = cJSON_Parse(parse_start);
+			if (g_hw_json)
+			{
+				wcscpy_s(g_hw_json_path, MAX_PATH, full_path);
+				g_need_initial_save = nk_false;
+			}
+			else
+			{
+				g_need_initial_save = nk_true;
+				// DEBUG: Show message box if JSON parsing fails on a file
+				char err_msg[2048];
+				snprintf(err_msg, sizeof(err_msg), "cJSON_Parse failed on file!\nError: %s\nBuffer length: %zu\nBuffer start: %.100s", cJSON_GetErrorPtr() ? cJSON_GetErrorPtr() : "NULL", read_size, parse_start);
+				MessageBoxA(NULL, err_msg, "Debug JSON Parse Error", MB_OK);
+			}
+
+			free(json_buffer);
 		}
 		else
 		{
@@ -186,38 +202,46 @@ void gnwinfo_hw_compare_reload(void)
 
 		printf("DEBUG: Found latest JSON file: %S\n", latest_file);
 
-		FILE* fp = NULL;
-		if (_wfopen_s(&fp, full_path, L"rb") == 0 && fp)
+		size_t read_size = 0;
+		char* json_buffer = gnwinfo_read_encrypted_fileW(full_path, &read_size);
+		if (json_buffer)
 		{
-			fseek(fp, 0, SEEK_END);
-			long file_size = ftell(fp);
-			fseek(fp, 0, SEEK_SET);
-
-			char* json_buffer = (char*)malloc(file_size + 1);
-			if (json_buffer)
+			if (g_hw_json)
 			{
-				size_t read_size = fread(json_buffer, 1, file_size, fp);
-				json_buffer[read_size] = '\0';
-
-				if (g_hw_json)
-				{
-					cJSON_Delete(g_hw_json);
-					g_hw_json = NULL;
-				}
-				g_hw_json = cJSON_Parse(json_buffer);
-				if (g_hw_json)
-				{
-					wcscpy_s(g_hw_json_path, MAX_PATH, full_path);
-					printf("DEBUG: Reloaded JSON file: %S\n", latest_file);
-				}
-				else
-				{
-					printf("DEBUG: Failed to parse JSON file: %S\n", latest_file);
-				}
-
-				free(json_buffer);
+				cJSON_Delete(g_hw_json);
+				g_hw_json = NULL;
 			}
-			fclose(fp);
+			
+			char* parse_start = json_buffer;
+			if (read_size >= 3 && (unsigned char)json_buffer[0] == 0xEF && (unsigned char)json_buffer[1] == 0xBB && (unsigned char)json_buffer[2] == 0xBF)
+			{
+				parse_start += 3;
+			}
+			
+			int in_string = 0;
+			for (size_t i = 0; i < read_size; i++) {
+				if (json_buffer[i] == '"' && (i == 0 || json_buffer[i-1] != '\\')) {
+					in_string = !in_string;
+				}
+				if (in_string) {
+					if (json_buffer[i] == '\n' || json_buffer[i] == '\r') {
+						json_buffer[i] = ' ';
+					}
+				}
+			}
+
+			g_hw_json = cJSON_Parse(parse_start);
+			if (g_hw_json)
+			{
+				wcscpy_s(g_hw_json_path, MAX_PATH, full_path);
+				printf("DEBUG: Reloaded JSON file: %S\n", latest_file);
+			}
+			else
+			{
+				printf("DEBUG: Failed to parse JSON file: %S\n", latest_file);
+			}
+
+			free(json_buffer);
 		}
 	}
 }
