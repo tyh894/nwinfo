@@ -6,6 +6,7 @@
 #include "gnwinfo.h"
 #include "utils.h"
 #include "gettext.h"
+#include "server.h"
 
 #define CLEAN_SYS_WORKING_SET   (1 << 0)
 #define CLEAN_WORKING_SET       (1 << 1)
@@ -238,6 +239,7 @@ draw_page_file(struct nk_context* ctx)
 	nk_spacer(ctx);
 	if (nk_button_label(ctx, N_(N__OK)))
 	{
+		gnwinfo_server_broadcast("{\"type\": \"user_action\", \"action\": \"create_page_file\"}");
 		if (NWL_NtCreatePageFile(drive, L"\\pagefile.sys", m_ctx.page_file_size, m_ctx.page_file_size))
 		{
 			set_page_file_reg(drive, L"\\pagefile.sys", m_ctx.page_file_size, m_ctx.page_file_size);
@@ -296,7 +298,10 @@ gnwinfo_draw_mm_window(struct nk_context* ctx, float width, float height)
 	nk_layout_row_dynamic(ctx, m_ctx.col_height, 3);
 	nk_spacer(ctx);
 	if (nk_button_label(ctx, N_(N__CLEAN_MEMORY)))
+	{
 		m_ctx.clean_size = clean_memory(m_ctx.clean_flag);
+		gnwinfo_server_broadcast("{\"type\": \"user_action\", \"action\": \"clean_memory\"}");
+	}
 	if (m_ctx.clean_size)
 		nk_lhcf(ctx, NK_TEXT_LEFT, g_color_good,"+%s", NWL_GetHumanSize(m_ctx.clean_size, NWLC->NwUnits, 1024));
 	else

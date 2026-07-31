@@ -9,6 +9,7 @@
 #include "gnwinfo.h"
 #include "gettext.h"
 #include "utils.h"
+#include "server.h"
 
 static CHAR m_buf[MAX_PATH];
 static int g_group_index = 0;
@@ -214,6 +215,11 @@ static DWORD WINAPI memory_test_thread(LPVOID param)
 	g_mem_test_result = (int)errors;
 	g_mem_test_size = allocated_blocks * BLOCK_SIZE;
 	save_mem_test_result((int)errors, g_mem_test_size);
+	
+	char msg[256];
+	snprintf(msg, sizeof(msg), "{\"type\": \"test_result\", \"test\": \"memory\", \"status\": \"%s\", \"errors\": %llu}", errors == 0 ? "pass" : "fail", (unsigned long long)errors);
+	gnwinfo_server_broadcast(msg);
+	
 	g_mem_test_running = 0;
 	return 0;
 }
@@ -222,6 +228,8 @@ static void start_memory_test(void)
 {
 	if (g_mem_test_running)
 		return;
+
+	gnwinfo_server_broadcast("{\"type\": \"user_action\", \"action\": \"start_memory_test\"}");
 
 	g_mem_test_running = 1;
 	g_mem_test_result = -1;
@@ -303,6 +311,11 @@ static DWORD WINAPI cpu_test_thread(LPVOID param)
 	
 	g_cpu_test_result = (int)(errors > 0 ? 1 : 0);
 	save_cpu_test_result(g_cpu_test_result, prime_count, total_tests);
+	
+	char msg[256];
+	snprintf(msg, sizeof(msg), "{\"type\": \"test_result\", \"test\": \"cpu\", \"status\": \"%s\"}", g_cpu_test_result == 0 ? "pass" : "fail");
+	gnwinfo_server_broadcast(msg);
+	
 	g_cpu_test_running = 0;
 	return 0;
 }
@@ -311,6 +324,8 @@ static void start_cpu_test(void)
 {
 	if (g_cpu_test_running)
 		return;
+
+	gnwinfo_server_broadcast("{\"type\": \"user_action\", \"action\": \"start_cpu_test\"}");
 
 	g_cpu_test_running = 1;
 	g_cpu_test_result = -1;
@@ -457,6 +472,10 @@ run_powershell_script(LPCSTR script_name_with_args)
 {
 	if (g_optimize_running)
 		return;
+	
+	char msg[512];
+	snprintf(msg, sizeof(msg), "{\"type\": \"user_action\", \"action\": \"run_script\", \"script\": \"%s\"}", script_name_with_args);
+	gnwinfo_server_broadcast(msg);
 	
 	g_optimize_running = 1;
 	g_optimize_progress = 0;

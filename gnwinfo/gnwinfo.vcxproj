@@ -190,6 +190,7 @@
     <ClInclude Include="lang\zh_CN.h" />
     <ClInclude Include="lang\zh_TW.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="server.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\nuklear\nuklear.c" />
@@ -214,6 +215,7 @@
     <ClCompile Include="style.c" />
     <ClCompile Include="summary.c" />
     <ClCompile Include="utils.c" />
+    <ClCompile Include="server.c" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\libnw\libnw.vcxproj">

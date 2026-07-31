@@ -1,0 +1,98 @@
+﻿ (哨兵软件) TCP 事件推送接口说明文档
+
+1. 接口概述
+--------------------------------------------------------------------------------
+软件在运行期间会在后台开启一个 TCP 服务端。
+局域网内的任何客户端可以通过 TCP 连接该端口，以实时接收软件中发生的各种警告信息及用户的操作事件。
+
+- 监听IP: 软件所在机器的 IP 地址 
+- 监听端口: 8080 (默认)
+- 通信协议: TCP
+- 数据格式: JSON 字符串，每条消息以回车换行符 \\r\\n 结尾 (方便客户端逐行读取防粘包)
+- 字符编码: UTF-8 
+
+2. 推送事件清单及 JSON 格式说明
+--------------------------------------------------------------------------------
+客户端连接成功后，无需发送任何指令，处于被动接收状态即可。当以下情况发生时，服务端将主动推送对应的 JSON 数据。
+
+2.1 硬件/系统警告类事件 (Warning)
+
+  (1) 硬盘健康度告警
+      触发条件: 当软件检测到某块硬盘的健康状态转为\"警告(Caution)\"或\"危险(Bad)\"时。
+      JSON 示例:
+      {\"type\": \"warning\", \"source\": \"disk_reliability_information\", \"disk\": 0, \"status\": \"Caution\"}
+      字段说明:
+        - type:   事件大类，固定为 \"warning\"
+        - source: 警告来源，此处为 \"disk reliability information\"
+        - disk:   硬盘序号 (整型，如 0 代表第一块硬盘)
+        - status: 具体的健康状态字符串 (如 \"Caution\" 或 \"Bad\")
+
+  (2) 系统异常弹窗告警
+      触发条件: 当底层读取失败或遇到需要弹出系统错误对话框的严重异常时。
+      JSON 示例:
+      {\"type\": \"warning\", \"message\": \"Failed to read memory...\"}
+      字段说明:
+        - message: 具体的错误原因或异常信息内容
+
+2.2 测试类事件 (Test Result)
+
+  (1) CPU 压力测试结果
+      触发条件: 用户在软件中点击\"测试 CPU\"，当整个测试跑完结束时推送。
+      JSON 示例:
+      {\"type\": \"test_result\", \"test\": \"cpu\", \"status\": \"pass\"}
+      字段说明:
+        - type:   固定为 \"test_result\"
+        - test:   测试类型，此处为 \"cpu\"
+        - status: 测试结果，通过为 \"pass\"，失败/出错为 \"fail\"
+
+  (2) 内存压力测试结果
+      触发条件: 用户在软件中点击\"测试内存\"，当整个测试跑完结束时推送。
+      JSON 示例:
+      {\"type\": \"test_result\", \"test\": \"memory\", \"status\": \"pass\", \"errors\": 0}
+      字段说明:
+        - type:   固定为 \"test_result\"
+        - test:   测试类型，此处为 \"memory\"
+        - status: 测试结果，通过为 \"pass\"，失败为 \"fail\"
+        - errors: 具体的错误块数量 (整型，0代表无错误)
+
+2.3 用户主动操作类事件 (User Action)
+
+  (1) 执行系统优化/回退脚本
+      触发条件: 用户在界面上点击了某种级别的优化（基础、深度、完全、自定义）或者进行了优化还原。
+      JSON 示例:
+      {\"type\": \"user_action\", \"action\": \"run_script\", \"script\": \"run-optimize.ps1 -Level basic \"}
+      字段说明:
+        - type:   固定为 \"user_action\"
+        - action: 操作类型，此处为 \"run_script\"
+        - script: 具体执行的 PowerShell 脚本名称及附带的参数。例如 \"undo-optimize.ps1 -Level prev\" 表示执行了还原操作。
+
+  (2) 清理系统内存
+      触发条件: 用户在\"内存\"界面点击了\"清理内存\"按钮。
+      JSON 示例:
+      {\"type\": \"user_action\", \"action\": \"clean_memory\"}
+
+  (3) 创建页面文件 (虚拟内存)
+      触发条件: 用户在\"内存\"界面创建或修改页面文件并点击了确定。
+      JSON 示例:
+      {\"type\": \"user_action\", \"action\": \"create_page_file\"}
+
+  (4) 刷新硬盘数据
+      触发条件: 用户在存储界面点击了\"刷新\"按钮。
+      JSON 示例:
+      {\"type\": \"user_action\", \"action\": \"refresh_disk_information\"}
+
+  (5) 保存软件设置
+      触发条件: 用户在设置界面修改了参数并点击了\"保存\"按钮。
+      JSON 示例:
+      {\"type\": \"user_action\", \"action\": \"save_settings\"}
+
+2.4 系统自动事件 (System Event)
+
+  (1) 硬件配置快照保存
+      触发条件: 当软件检测到当前硬件与上次记录不符，或者系统主动保存了当前的硬件配置快照 JSON 文件时。
+      JSON 示例:
+      {\"type\": \"system_event\", \"action\": \"save_hw_config\", \"file\": \"C:\\\\Users\\\\Admin\\\\herosys_data\\\\hw_config_20260730_123456.json\"}
+      字段说明:
+        - type:   固定为 \"system_event\"
+        - action: 固定为 \"save_hw_config\"
+        - file:   本次保存的硬件配置快照的绝对文件路径

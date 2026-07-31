@@ -2,6 +2,7 @@
 
 #include "gnwinfo.h"
 #include "gettext.h"
+#include "server.h"
 #include "../libcdi/libcdi.h"
 
 LPCSTR NWL_Ucs2ToUtf8(LPCWSTR src);
@@ -50,6 +51,17 @@ draw_health(struct nk_context* ctx, CDI_SMART* smart, int disk, float height)
 		nk_l(ctx, N_(N__HEALTH_STATUS), NK_TEXT_CENTERED);
 		n = cdi_get_int(smart, disk, CDI_INT_LIFE);
 		health = cdi_get_int(smart, disk, CDI_INT_DISK_STATUS);
+		
+		static int last_health[32] = {0};
+		if (disk >= 0 && disk < 32 && last_health[disk] != health) {
+			last_health[disk] = health;
+			if (health == CDI_DISK_STATUS_CAUTION || health == CDI_DISK_STATUS_BAD) {
+				char msg[256];
+				snprintf(msg, sizeof(msg), "{\"type\": \"warning\", \"source\": \"disk_reliability_information\", \"disk\": %d, \"status\": \"%s\"}", disk, get_health_status(health));
+				gnwinfo_server_broadcast(msg);
+			}
+		}
+
 		if (n >= 0)
 			snprintf(tmp, sizeof(tmp), "%s\n%d%%", get_health_status(health), n);
 		else
@@ -310,7 +322,10 @@ gnwinfo_draw_smart_window(struct nk_context* ctx, float width, float height)
 		NWL_GetHumanSize(cdi_get_dword(NWLC->NwSmart, cur_disk, CDI_DWORD_DISK_SIZE), &NWLC->NwUnits[2], 1000));
 	cdi_free_string(str);
 	if (nk_button_image_label(ctx, GET_PNG(IDR_PNG_REFRESH), N_(N__REFRESH), NK_TEXT_CENTERED))
+	{
+		gnwinfo_server_broadcast("{\"type\": \"user_action\", \"action\": \"refresh_disk_information\"}");
 		cdi_update_smart(NWLC->NwSmart, cur_disk);
+	}
 	g_ctx.smart_hex = !nk_check_label(ctx, N_(N__HEX), !g_ctx.smart_hex);
 	
 	nk_layout_row(ctx, NK_DYNAMIC, height / 4.0f, 2, (float[2]) {0.2f, 0.8f});

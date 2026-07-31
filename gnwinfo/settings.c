@@ -2,6 +2,7 @@
 
 #include "gnwinfo.h"
 #include "gettext.h"
+#include "server.h"
 #include "../libcdi/libcdi.h"
 
 LPCSTR NWL_Ucs2ToUtf8(LPCWSTR src);
@@ -282,6 +283,7 @@ gnwinfo_draw_settings_window(struct nk_context* ctx, float width, float height)
 	nk_spacer(ctx);
 	if (nk_button_label(ctx, N_(N__SAVE)))
 	{
+		gnwinfo_server_broadcast("{\"type\": \"user_action\", \"action\": \"save_settings\"}");
 		gnwinfo_set_ini_value(L"Widgets", L"MainFlags", L"0x%08X", g_ctx.main_flag);
 		gnwinfo_set_ini_value(L"Widgets", L"SmartFormat", L"%d", g_ctx.smart_hex);
 		gnwinfo_set_ini_value(L"Widgets", L"SmartFlags", L"0x%08X", g_ctx.smart_flag);

@@ -9,6 +9,7 @@
 
 #include "../libcpuid/libcpuid.h"
 #include "../libcpuid/libcpuid_util.h"
+#include "server.h"
 
 GNW_CONTEXT g_ctx;
 
@@ -37,6 +38,9 @@ fail:
 static void
 gnwinfo_ctx_error_callback(LPCSTR lpszText)
 {
+	char msg[1024];
+	snprintf(msg, sizeof(msg), "{\"type\": \"warning\", \"message\": \"%s\"}", lpszText);
+	gnwinfo_server_broadcast(msg);
 	MessageBoxA(g_ctx.wnd, lpszText, "Error", MB_ICONERROR);
 }
 
@@ -747,6 +751,8 @@ gnwinfo_ctx_init(HINSTANCE inst, HWND wnd, struct nk_context* ctx, float width, 
 		{
 		}
 	}
+
+	gnwinfo_server_init();
 }
 
 noreturn void
@@ -788,6 +794,7 @@ gnwinfo_ctx_exit(void)
 	gnwinfo_hw_compare_fini();
 	gnwinfo_smart_history_fini();
 	gnwinfo_bsod_fini();
+	gnwinfo_server_fini();
 
 	NWL_NodeFree(g_ctx.network, 1);
 	NWL_NodeFree(g_ctx.disk, 1);
